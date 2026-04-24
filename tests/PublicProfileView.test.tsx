@@ -122,6 +122,21 @@ describe('PublicProfileView', () => {
     });
   });
 
+  it('clear chat button is clickable', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      renderPublicProfile();
+    });
+    await waitFor(() => {
+      expect(document.querySelector('.lucide-trash-2')).toBeInTheDocument();
+    });
+
+    const clearButton = document.querySelector('.lucide-trash-2');
+    await act(async () => {
+      await user.click(clearButton!);
+    });
+  });
+
   it('renders suggestion button', async () => {
     await act(async () => {
       renderPublicProfile();
