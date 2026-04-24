@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import {
   History,
   UserSearch,
@@ -17,6 +18,7 @@ import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord } from '../
 import { DecisionAnalysis, ProfileData } from '../types';
 
 export default function DecisionMakerView() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzingStage, setAnalyzingStage] = useState<string>('');
@@ -26,7 +28,6 @@ export default function DecisionMakerView() {
   const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use ref for threadId to avoid stale closure in async handleAnalyze
   const threadIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function DecisionMakerView() {
       })
       .catch((err) => {
         console.error("Failed to fetch profile:", err);
-        if (mounted) setError("无法加载个人信息，请刷新页面重试。");
+        if (mounted) setError(t('common.error'));
       });
 
     fetchDecisions()
@@ -52,7 +53,7 @@ export default function DecisionMakerView() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [t]);
 
   const handleAnalyze = async () => {
     if (!query.trim()) return;
@@ -61,22 +62,20 @@ export default function DecisionMakerView() {
     setMessages(prev => [...prev, { role: 'user', content: userQuery }]);
     setQuery('');
     setIsAnalyzing(true);
-    setAnalyzingStage('正在连接 AI 服务...');
+    setAnalyzingStage(t('decisionMaker.connecting'));
 
     try {
-      setAnalyzingStage('正在分析您的背景信息...');
+      setAnalyzingStage(t('decisionMaker.analyzingBackground'));
       const { reply, threadId: newThreadId } = await chatWithAgent(userQuery, {
         threadId: threadIdRef.current || undefined,
         mode: 'decision',
       });
-      // Update threadId ref for follow-up messages
       if (!threadIdRef.current) {
         threadIdRef.current = newThreadId;
       }
 
-      setAnalyzingStage('正在解析分析结果...');
+      setAnalyzingStage(t('decisionMaker.parsingResults'));
 
-      // Try parse JSON response for structured analysis
       try {
         const match = reply.match(/\{[\s\S]*?\}/);
         if (match) {
@@ -92,7 +91,7 @@ export default function DecisionMakerView() {
       console.error(err);
       setMessages(prev => [...prev, {
         role: 'ai',
-        content: "网络连接失败，请检查网络后重试。如果问题持续存在，请稍后再试。",
+        content: t('decisionMaker.networkError'),
         error: true
       }]);
     } finally {
@@ -119,8 +118,8 @@ export default function DecisionMakerView() {
     <div className="flex flex-col h-[calc(100vh-12rem)] gap-8">
       <header className="flex items-center justify-between pb-4 border-b border-outline-variant/30 shrink-0">
         <div>
-          <h1 className="text-3xl font-bold text-on-surface">Decision Maker</h1>
-          <p className="text-sm text-on-surface-variant mt-1 opacity-70">Analyzing choices against personal context.</p>
+          <h1 className="text-3xl font-bold text-on-surface">{t('decisionMaker.title')}</h1>
+          <p className="text-sm text-on-surface-variant mt-1 opacity-70">{t('decisionMaker.analyzingChoices')}</p>
         </div>
         {error && (
           <div className="bg-error-container text-on-error-container px-4 py-2 rounded-lg text-sm">
@@ -128,21 +127,20 @@ export default function DecisionMakerView() {
           </div>
         )}
         <button onClick={() => setShowHistory(!showHistory)} className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all">
-          <History className="w-4 h-4" /> History
+          <History className="w-4 h-4" /> {t('dashboard.viewAllLogs')}
         </button>
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row gap-8 overflow-hidden">
-        {/* Context Panel */}
         <aside className="w-full lg:w-80 flex flex-col gap-6 shrink-0 overflow-y-auto pr-2 pb-4 scrollbar-hide">
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6">
             <h2 className="text-lg font-bold text-on-surface mb-6 flex items-center gap-2.5">
-              <UserSearch className="text-primary w-5 h-5" /> Personal Context
+              <UserSearch className="text-primary w-5 h-5" /> {t('decisionMaker.personalContext')}
             </h2>
             <div className="space-y-6">
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Core Values</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">{t('decisionMaker.coreValues')}</span>
                   <button className="text-secondary hover:brightness-110 transition-colors">
                     <Edit3 size={14} />
                   </button>
@@ -152,11 +150,11 @@ export default function DecisionMakerView() {
                     <span key={i} className="bg-primary/10 border border-primary/20 text-primary font-mono text-[10px] px-2.5 py-1 rounded-lg">
                       {typeof val === 'string' ? val : JSON.stringify(val)}
                     </span>
-                  )) : <span className="text-sm text-on-surface-variant">No values set</span>}
+                  )) : <span className="text-sm text-on-surface-variant">{t('decisionMaker.noDecisions')}</span>}
                 </div>
               </div>
               <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60 block mb-2">Current Goal</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60 block mb-2">{t('decisionMaker.currentGoal')}</span>
                 <p className="text-sm text-on-surface leading-relaxed bg-surface-container-highest/30 p-4 rounded-xl border border-outline-variant/10">
                   {context.currentGoal}
                 </p>
@@ -166,11 +164,11 @@ export default function DecisionMakerView() {
 
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-6 flex-1">
             <h2 className="text-lg font-bold text-on-surface mb-6 flex items-center gap-2.5">
-              <History className="text-on-surface-variant w-5 h-5" /> Recent Decisions
+              <History className="text-on-surface-variant w-5 h-5" /> {t('decisionMaker.recentDecisions')}
             </h2>
             <ul className="space-y-4">
               {decisions.length === 0 && (
-                <li className="text-sm text-on-surface-variant">No decisions yet</li>
+                <li className="text-sm text-on-surface-variant">{t('decisionMaker.noDecisions')}</li>
               )}
               {decisions.slice(0, 5).map((d) => {
                 const alignmentValue = typeof d.analysis?.alignment === 'number'
@@ -192,13 +190,12 @@ export default function DecisionMakerView() {
           </div>
         </aside>
 
-        {/* Chat / Decision Workspace */}
         <section className="flex-1 flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-2xl overflow-hidden shadow-2xl relative">
           <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 flex flex-col items-center scrollbar-hide">
             <div className="w-full max-w-[800px] space-y-8 pb-10">
               <AnimatePresence initial={false}>
                 {messages.map((msg, idx) => (
-                  <motion.div 
+                  <motion.div
                     key={idx}
                     initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -212,13 +209,13 @@ export default function DecisionMakerView() {
                     ) : msg.error ? (
                       <div className="w-full space-y-4">
                         <div className="bg-error-container/20 border-l-4 border-error rounded-r-2xl rounded-br-2xl p-6">
-                          <p className="text-on-surface leading-relaxed">{typeof msg.content === 'string' ? msg.content : '发生错误'}</p>
+                          <p className="text-on-surface leading-relaxed">{typeof msg.content === 'string' ? msg.content : t('common.error')}</p>
                         </div>
                         <button
                           onClick={handleRetry}
                           className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors px-4 py-2 rounded-lg hover:bg-surface-container"
                         >
-                          <Send size={14} /> 重新发送刚才的问题
+                          <Send size={14} /> {t('decisionMaker.retryQuestion')}
                         </button>
                       </div>
                     ) : (
@@ -233,7 +230,7 @@ export default function DecisionMakerView() {
                               <p className="text-[15px] text-on-surface leading-relaxed opacity-90">
                                 {msg.content.summary}
                               </p>
-                              
+
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="bg-surface-container border border-outline-variant/20 p-5 rounded-xl hover:border-secondary/30 transition-all group">
                                   <h3 className="text-[10px] font-black uppercase tracking-widest text-secondary mb-4 flex items-center gap-1.5">
@@ -307,7 +304,7 @@ export default function DecisionMakerView() {
                     <div className="flex items-center gap-3">
                       <Loader2 className="w-5 h-5 text-secondary animate-spin" />
                       <span className="text-sm font-medium text-secondary animate-pulse">
-                        {analyzingStage || '正在思考中...'}
+                        {analyzingStage || t('decisionMaker.thinking')}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-on-surface-variant">
@@ -328,11 +325,11 @@ export default function DecisionMakerView() {
                   <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mb-6">
                     <Scale className="w-8 h-8 text-secondary/50" />
                   </div>
-                  <h3 className="text-lg font-semibold text-on-surface mb-2">开始你的决策分析</h3>
+                  <h3 className="text-lg font-semibold text-on-surface mb-2">{t('decisionMaker.startAnalysis')}</h3>
                   <p className="text-sm text-on-surface-variant max-w-md">
-                    描述你面临的抉择，AI 将基于你的价值观和目标给出结构化分析。
+                    {t('decisionMaker.subtitle')}
                     <br />
-                    例如：「我应该去大厂还是创业公司？」
+                    {t('decisionMaker.examplePlaceholder')}
                   </p>
                 </motion.div>
               )}
@@ -341,15 +338,15 @@ export default function DecisionMakerView() {
 
           <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low shrink-0">
             <div className="max-w-[800px] mx-auto relative flex items-center">
-              <textarea 
+              <textarea
                 className="w-full bg-surface-container border border-outline-variant/30 rounded-2xl py-4 pl-5 pr-14 text-on-surface text-[15px] focus:ring-2 focus:ring-primary/20 focus:border-primary/50 resize-none placeholder-on-surface-variant/40 min-h-[56px] transition-all"
-                placeholder="Ask follow-up or provide more details..." 
+                placeholder={t('decisionMaker.askFollowUp')}
                 rows={1}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleAnalyze())}
               />
-              <button 
+              <button
                 onClick={handleAnalyze}
                 disabled={isAnalyzing || !query.trim()}
                 className="absolute right-3 p-2.5 bg-primary text-on-primary hover:brightness-110 disabled:opacity-30 disabled:grayscale transition-all rounded-xl shadow-lg"
@@ -359,7 +356,7 @@ export default function DecisionMakerView() {
             </div>
             <div className="max-w-[800px] mx-auto mt-3 flex items-center gap-3">
               <span className="flex items-center gap-1.5 font-mono text-[9px] text-on-surface-variant bg-surface-container px-2.5 py-1 rounded-lg border border-outline-variant/20">
-                <Terminal size={10} /> Model: Gemini 3 Flash
+                <Terminal size={10} /> {t('decisionMaker.model')}: Gemini 3 Flash
               </span>
             </div>
           </div>

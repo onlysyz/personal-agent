@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Database,
   Save,
@@ -15,10 +15,12 @@ import {
   Loader2
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { fetchProfile, saveProfile } from '../services/api';
 import { ProfileData } from '../types';
 
 export default function DataEditorView() {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [jsonText, setJsonText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,7 @@ export default function DataEditorView() {
 
   useEffect(() => {
     let mounted = true;
-    setLoadingStage('正在加载配置文件...');
+    setLoadingStage(t('dataEditor.loading'));
     fetchProfile()
       .then((data) => {
         if (mounted) {
@@ -39,7 +41,7 @@ export default function DataEditorView() {
       })
       .catch((err) => {
         console.error("Failed to fetch profile:", err);
-        if (mounted) setError("无法加载配置文件，请刷新页面重试。");
+        if (mounted) setError(t('dataEditor.loadFailed'));
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -48,23 +50,23 @@ export default function DataEditorView() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [t]);
 
   const handleSave = async () => {
     if (!profile) return;
     setSaving(true);
     setMessage(null);
     setError(null);
-    setLoadingStage('正在解析 JSON...');
+    setLoadingStage(t('common.loading'));
     try {
       const parsed = JSON.parse(jsonText);
-      setLoadingStage('正在保存到磁盘...');
+      setLoadingStage(t('dataEditor.commitToDisk'));
       await saveProfile(parsed);
       setProfile(parsed);
-      setMessage({ type: 'success', text: 'Profile saved successfully' });
+      setMessage({ type: 'success', text: t('dataEditor.savedSuccess') });
     } catch (err) {
       console.error("Save failed:", err);
-      setError("保存失败：无效的 JSON 格式或服务器错误");
+      setError(t('dataEditor.saveFailed'));
     } finally {
       setSaving(false);
       setLoadingStage('');
@@ -81,7 +83,7 @@ export default function DataEditorView() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <Loader2 size={32} className="animate-spin text-secondary" />
-        <span className="text-sm text-on-surface-variant">{loadingStage || 'Loading...'}</span>
+        <span className="text-sm text-on-surface-variant">{loadingStage || t('common.loading')}</span>
       </div>
     );
   }
@@ -90,13 +92,13 @@ export default function DataEditorView() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="bg-error-container/20 border border-error/30 rounded-2xl p-6 max-w-md">
-          <h3 className="text-lg font-bold text-on-surface mb-2">加载失败</h3>
+          <h3 className="text-lg font-bold text-on-surface mb-2">{t('dataEditor.loadError')}</h3>
           <p className="text-sm text-on-surface-variant mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-primary text-on-primary rounded-xl font-medium hover:brightness-110 transition-all"
           >
-            刷新页面
+            {t('common.refresh')}
           </button>
         </div>
       </div>
@@ -109,11 +111,11 @@ export default function DataEditorView() {
         <div>
           <div className="flex items-center gap-3 mb-3">
             <Database className="text-secondary w-8 h-8" />
-            <h1 className="text-3xl font-bold text-on-surface">Data Editor</h1>
+            <h1 className="text-3xl font-bold text-on-surface">{t('dataEditor.title')}</h1>
           </div>
           <div className="flex items-center gap-2 text-on-surface-variant bg-surface-container-low px-3 py-1.5 rounded-lg border border-outline-variant/20">
-            <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Target:</span>
-            <code className="text-xs font-mono text-primary">data/profile.json</code>
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">{t('dataEditor.target')}</span>
+            <code className="text-xs font-mono text-primary">{t('dataEditor.filePath')}</code>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -132,7 +134,7 @@ export default function DataEditorView() {
             onClick={handleDiscard}
             className="px-6 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface font-bold text-xs uppercase tracking-widest hover:bg-surface-container-high transition-all flex items-center gap-2"
           >
-            <RotateCcw size={16} /> Discard Changes
+            <RotateCcw size={16} /> {t('dataEditor.discardChanges')}
           </button>
           <button
             onClick={handleSave}
@@ -140,7 +142,7 @@ export default function DataEditorView() {
             className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs uppercase tracking-widest hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-primary/10 disabled:opacity-50"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Commit to Disk
+            {t('dataEditor.commitToDisk')}
           </button>
         </div>
       </div>
@@ -151,10 +153,10 @@ export default function DataEditorView() {
           <div className="flex items-center justify-between border-b border-outline-variant/10 pb-4">
             <div className="flex items-center gap-2.5">
               <ShieldCheck className="text-secondary w-5 h-5" />
-              <h2 className="text-lg font-bold text-on-surface">Basic Info</h2>
+              <h2 className="text-lg font-bold text-on-surface">{t('dataEditor.basicInfo')}</h2>
             </div>
             <button className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-on-surface-variant bg-surface-container-highest/30 px-3 py-1.5 rounded-lg border border-outline-variant/20 hover:text-on-surface transition-all">
-              <Globe size={12} /> All Public
+              <Globe size={12} /> {t('dataEditor.allPublic')}
             </button>
           </div>
 
@@ -170,10 +172,10 @@ export default function DataEditorView() {
           <div className="flex items-center justify-between border-b border-outline-variant/10 pb-4">
             <div className="flex items-center gap-2.5">
               <Terminal className="text-primary w-5 h-5" />
-              <h2 className="text-lg font-bold text-on-surface">Capabilities & Skills</h2>
+              <h2 className="text-lg font-bold text-on-surface">{t('dataEditor.capabilitiesSkills')}</h2>
             </div>
             <button className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-on-surface-variant bg-surface-container-highest/30 px-3 py-1.5 rounded-lg border border-outline-variant/20 hover:text-on-surface transition-all">
-              <Globe size={12} /> All Public
+              <Globe size={12} /> {t('dataEditor.allPublic')}
             </button>
           </div>
 
@@ -195,7 +197,7 @@ export default function DataEditorView() {
                 <input
                   type="text"
                   className="flex-1 bg-surface-container-highest/20 border border-outline-variant/20 rounded-xl px-4 py-2 text-sm text-on-surface placeholder-on-surface-variant/40 focus:ring-1 focus:ring-primary focus:border-primary transition-all"
-                  placeholder="Add a new skill..."
+                  placeholder={t('dataEditor.addSkill')}
                 />
                 <button className="bg-surface-container-highest/40 border border-outline-variant/20 px-4 py-2 rounded-xl text-on-surface hover:bg-surface-container transition-all">
                   <Plus size={18} />
@@ -209,7 +211,7 @@ export default function DataEditorView() {
         <section className="lg:col-span-2 bg-surface-container-low border border-outline-variant/20 rounded-2xl p-8 space-y-6 flex flex-col shadow-xl">
            <div className="flex items-center gap-2.5 border-b border-outline-variant/10 pb-4">
               <FileCode className="text-primary w-5 h-5" />
-              <h2 className="text-lg font-bold text-on-surface">Raw JSON Source</h2>
+              <h2 className="text-lg font-bold text-on-surface">{t('dataEditor.rawJson')}</h2>
            </div>
            <div className="relative group">
               <div className="absolute top-4 right-4 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

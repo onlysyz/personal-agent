@@ -1,0 +1,91 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "retry": "重试",
+    "cancel": "取消",
+    "save": "保存",
+    "submit": "提交",
+    "refresh": "刷新页面",
+    "search": "搜索",
+    "viewAll": "查看全部"
+  },
+  "sidebar": {
+    "coreAgent": "核心助手",
+    "localInstance": "本地实例",
+    "active": "活跃",
+    "deployAgent": "部署助手",
+    "documentation": "文档",
+    "support": "支持"
+  },
+  "topbar": {
+    "searchPlaceholder": "搜索知识库...",
+    "switchToLight": "切换到浅色模式",
+    "switchToDark": "切换到深色模式"
+  },
+  "dashboard": {
+    "currentFocus": "当前专注",
+    "activeCognitive": "活跃认知负载与进行中任务",
+    "primaryTask": "主要任务",
+    "noCurrentFocus": "暂无当前专注",
+    "knowledgeVectors": "知识向量",
+    "experienceContext": "经验背景",
+    "recentDynamics": "近期动态",
+    "viewAllLogs": "查看全部日志",
+    "online": "在线",
+    "agentId": "编号"
+  },
+  "decisionMaker": {
+    "title": "人生抉择器",
+    "subtitle": "描述你面临的抉择，AI 将基于你的价值观和目标给出结构化分析。",
+    "examplePlaceholder": "例如：「我应该去大厂还是创业公司？」",
+    "startAnalysis": "开始你的决策分析",
+    "analyzingChoices": "正在分析选择与个人背景的匹配度。",
+    "connecting": "正在连接 AI 服务...",
+    "analyzingBackground": "正在分析您的背景信息...",
+    "parsingResults": "正在解析分析结果...",
+    "thinking": "正在思考中...",
+    "personalContext": "个人背景",
+    "coreValues": "核心价值观",
+    "currentGoal": "当前目标",
+    "recentDecisions": "近期决策",
+    "noDecisions": "暂无决策记录",
+    "networkError": "网络连接失败，请检查网络后重试。如果问题持续存在，请稍后再试。",
+    "retryQuestion": "重新发送刚才的问题",
+    "askFollowUp": "继续追问或补充更多细节...",
+    "model": "模型"
+  },
+  "publicProfile": {
+    "title": "公开简历",
+    "welcome": "欢迎来到我的互动简历页。你可以询问关于我的背景、技能或经历的问题。",
+    "agentActive": "助手已激活",
+    "interactiveSession": "互动对话",
+    "agentIntro": "你好。我是数字分身。我有权限访问他的完整简历和职业历史。有什么我可以帮助你的？",
+    "askAnything": "询问关于我的任何问题",
+    "agentContext": "我可以访问完整的职业历史，包括工作经验、技能和职业轨迹。欢迎提出具体问题。",
+    "connecting": "正在连接 AI 服务...",
+    "queryingProfile": "正在查询个人信息...",
+    "thinking": "正在思考中...",
+    "networkError": "网络连接失败，请检查网络后重试。如果问题持续存在，请稍后再试。",
+    "retryQuestion": "重新发送刚才的问题",
+    "queryPlaceholder": "向助手提问...",
+    "aiVaries": "AI 回答可能有所不同。"
+  },
+  "dataEditor": {
+    "title": "数据编辑器",
+    "target": "目标：",
+    "filePath": "data/profile.json",
+    "loading": "正在加载配置文件...",
+    "loadFailed": "无法加载配置文件，请刷新页面重试。",
+    "loadError": "加载失败",
+    "basicInfo": "基本信息",
+    "allPublic": "全部公开",
+    "capabilitiesSkills": "能力与技能",
+    "rawJson": "原始 JSON",
+    "discardChanges": "放弃更改",
+    "commitToDisk": "提交到磁盘",
+    "savedSuccess": "个人信息保存成功",
+    "saveFailed": "保存失败：无效的 JSON 格式或服务器错误",
+    "addSkill": "添加新技能..."
+  }
+}

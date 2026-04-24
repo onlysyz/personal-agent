@@ -1,0 +1,91 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "submit": "Submit",
+    "refresh": "Refresh Page",
+    "search": "Search",
+    "viewAll": "View All"
+  },
+  "sidebar": {
+    "coreAgent": "Core Agent",
+    "localInstance": "Local Instance",
+    "active": "Active",
+    "deployAgent": "Deploy Agent",
+    "documentation": "Documentation",
+    "support": "Support"
+  },
+  "topbar": {
+    "searchPlaceholder": "Search knowledge base...",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode"
+  },
+  "dashboard": {
+    "currentFocus": "Current Focus",
+    "activeCognitive": "Active cognitive load and ongoing tasks",
+    "primaryTask": "Primary Task",
+    "noCurrentFocus": "No current focus set",
+    "knowledgeVectors": "Knowledge Vectors",
+    "experienceContext": "Experience Context",
+    "recentDynamics": "Recent Dynamics",
+    "viewAllLogs": "View All Logs",
+    "online": "Online",
+    "agentId": "ID"
+  },
+  "decisionMaker": {
+    "title": "Decision Maker",
+    "subtitle": "Describe your dilemma, AI will give structured analysis based on your values and goals.",
+    "examplePlaceholder": "e.g. \"Should I join a big tech or a startup?\"",
+    "startAnalysis": "Start Your Decision Analysis",
+    "analyzingChoices": "Analyzing choices against personal context.",
+    "connecting": "Connecting to AI service...",
+    "analyzingBackground": "Analyzing your background information...",
+    "parsingResults": "Parsing analysis results...",
+    "thinking": "Thinking...",
+    "personalContext": "Personal Context",
+    "coreValues": "Core Values",
+    "currentGoal": "Current Goal",
+    "recentDecisions": "Recent Decisions",
+    "noDecisions": "No decisions yet",
+    "networkError": "Network connection failed. Please check your connection and try again.",
+    "retryQuestion": "Resend the previous question",
+    "askFollowUp": "Ask follow-up or provide more details...",
+    "model": "Model"
+  },
+  "publicProfile": {
+    "title": "Public Profile",
+    "welcome": "Welcome to my interactive profile. Feel free to ask questions about my background, skills, or experience.",
+    "agentActive": "Agent Active",
+    "interactiveSession": "Interactive Session",
+    "agentIntro": "Hello. I am the digital representative. I have access to his complete resume and professional history. How can I assist you?",
+    "askAnything": "Ask me anything about my profile",
+    "agentContext": "I have access to my complete professional history including work experience, skills, and career trajectory. Feel free to ask specific questions.",
+    "connecting": "Connecting to AI service...",
+    "queryingProfile": "Querying profile information...",
+    "thinking": "Thinking...",
+    "networkError": "Network connection failed. Please check your connection and try again.",
+    "retryQuestion": "Resend the previous question",
+    "queryPlaceholder": "Query agent context...",
+    "aiVaries": "AI responses may vary."
+  },
+  "dataEditor": {
+    "title": "Data Editor",
+    "target": "Target:",
+    "filePath": "data/profile.json",
+    "loading": "Loading configuration file...",
+    "loadFailed": "Failed to load configuration file. Please refresh and try again.",
+    "loadError": "Load Error",
+    "basicInfo": "Basic Info",
+    "allPublic": "All Public",
+    "capabilitiesSkills": "Capabilities & Skills",
+    "rawJson": "Raw JSON Source",
+    "discardChanges": "Discard Changes",
+    "commitToDisk": "Commit to Disk",
+    "savedSuccess": "Profile saved successfully",
+    "saveFailed": "Save failed: invalid JSON format or server error",
+    "addSkill": "Add a new skill..."
+  }
+}

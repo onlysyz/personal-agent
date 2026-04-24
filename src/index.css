@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
-@theme {
+:root {
   --color-surface: #0b1326;
   --color-surface-dim: #0b1326;
   --color-surface-bright: #31394d;
@@ -10,21 +10,58 @@
   --color-surface-container: #171f33;
   --color-surface-container-high: #222a3d;
   --color-surface-container-highest: #2d3449;
-  
   --color-on-surface: #dae2fd;
   --color-on-surface-variant: #c7c4d7;
-  
   --color-primary: #c0c1ff;
   --color-on-primary: #1000a9;
   --color-primary-container: #8083ff;
-  
   --color-secondary: #5de6ff;
   --color-on-secondary: #00363e;
   --color-secondary-container: #00cbe6;
-  
   --color-outline: #908fa0;
   --color-outline-variant: #464554;
+}
 
+[data-theme="light"] {
+  --color-surface: #f5f6f8;
+  --color-surface-dim: #e8e9ec;
+  --color-surface-bright: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #eef0f3;
+  --color-surface-container: #e4e6ea;
+  --color-surface-container-high: #d8dae0;
+  --color-surface-container-highest: #cccfd4;
+  --color-on-surface: #1a1d26;
+  --color-on-surface-variant: #52565e;
+  --color-primary: #5050ff;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #e0e1ff;
+  --color-secondary: #00a3bf;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #b3f0ff;
+  --color-outline: #858a91;
+  --color-outline-variant: #c3c6cd;
+}
+
+@theme {
+  --color-surface: var(--color-surface);
+  --color-surface-dim: var(--color-surface-dim);
+  --color-surface-bright: var(--color-surface-bright);
+  --color-surface-container-lowest: var(--color-surface-container-lowest);
+  --color-surface-container-low: var(--color-surface-container-low);
+  --color-surface-container: var(--color-surface-container);
+  --color-surface-container-high: var(--color-surface-container-high);
+  --color-surface-container-highest: var(--color-surface-container-highest);
+  --color-on-surface: var(--color-on-surface);
+  --color-on-surface-variant: var(--color-on-surface-variant);
+  --color-primary: var(--color-primary);
+  --color-on-primary: var(--color-on-primary);
+  --color-primary-container: var(--color-primary-container);
+  --color-secondary: var(--color-secondary);
+  --color-on-secondary: var(--color-on-secondary);
+  --color-secondary-container: var(--color-secondary-container);
+  --color-outline: var(--color-outline);
+  --color-outline-variant: var(--color-outline-variant);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }

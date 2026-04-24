@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import {
   Fingerprint,
   Code,
@@ -20,6 +21,7 @@ import { fetchProfile } from '../services/api';
 import { ProfileData } from '../types';
 
 export default function DashboardView() {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<ProfileData | null>(null);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export default function DashboardView() {
   if (!profile) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-on-surface-variant">Loading...</div>
+        <div className="text-on-surface-variant">{t('common.loading')}</div>
       </div>
     );
   }
@@ -80,11 +82,11 @@ export default function DashboardView() {
 
           <div className="mt-8 pt-6 border-t border-outline-variant/20 flex gap-3">
             <span className="px-3 py-1 bg-surface-bright text-on-surface font-mono text-[10px] rounded border border-outline-variant/30">
-              ID: AGT-8821
+              {t('dashboard.agentId')}: AGT-8821
             </span>
             <span className="px-3 py-1 bg-secondary-container/10 text-secondary font-mono text-[10px] rounded border border-secondary/30 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
-              Online
+              {t('dashboard.online')}
             </span>
           </div>
         </motion.div>
@@ -102,9 +104,9 @@ export default function DashboardView() {
             <div>
               <h3 className="text-xl font-bold text-on-surface flex items-center gap-2.5">
                 <Memory className="text-secondary w-6 h-6" />
-                Current Focus
+                {t('dashboard.currentFocus')}
               </h3>
-              <p className="text-sm text-on-surface-variant mt-1">Active cognitive load and ongoing tasks</p>
+              <p className="text-sm text-on-surface-variant mt-1">{t('dashboard.activeCognitive')}</p>
             </div>
             <button className="p-2 bg-surface-bright rounded-xl border border-outline-variant/30 hover:border-outline-variant/60 transition-all text-on-surface-variant hover:text-on-surface">
               <Edit3 size={18} />
@@ -115,10 +117,10 @@ export default function DashboardView() {
             <div className="bg-surface-container-highest/40 border border-outline-variant/20 rounded-2xl p-6 mb-6 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-3">
                 <Brain className="text-primary w-4 h-4" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Primary Task</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">{t('dashboard.primaryTask')}</span>
               </div>
               <h4 className="text-2xl font-bold text-on-surface mb-3 leading-tight">
-                {profile.currentFocus?.title || "No current focus set"}
+                {profile.currentFocus?.title || t('dashboard.noCurrentFocus')}
               </h4>
               <p className="text-on-surface-variant leading-relaxed opacity-80">
                 {profile.currentFocus?.description || ""}
@@ -149,7 +151,7 @@ export default function DashboardView() {
         >
           <div className="flex items-center gap-3 mb-8">
             <Zap className="text-primary w-6 h-6" />
-            <h3 className="text-xl font-bold text-on-surface">Knowledge Vectors</h3>
+            <h3 className="text-xl font-bold text-on-surface">{t('dashboard.knowledgeVectors')}</h3>
           </div>
 
           <div className="flex-1 space-y-7">
@@ -183,7 +185,7 @@ export default function DashboardView() {
         >
           <div className="flex items-center gap-3 mb-8">
             <History className="text-primary w-6 h-6" />
-            <h3 className="text-xl font-bold text-on-surface">Experience Context</h3>
+            <h3 className="text-xl font-bold text-on-surface">{t('dashboard.experienceContext')}</h3>
           </div>
 
           <div className="relative border-l border-outline-variant/20 ml-3 space-y-10 pb-4">
@@ -218,9 +220,9 @@ export default function DashboardView() {
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center gap-3">
               <Activity className="text-primary w-6 h-6" />
-              <h3 className="text-xl font-bold text-on-surface">Recent Dynamics</h3>
+              <h3 className="text-xl font-bold text-on-surface">{t('dashboard.recentDynamics')}</h3>
             </div>
-            <button className="text-xs font-bold text-primary hover:underline tracking-widest uppercase">View All Logs</button>
+            <button className="text-xs font-bold text-primary hover:underline tracking-widest uppercase">{t('dashboard.viewAllLogs')}</button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
