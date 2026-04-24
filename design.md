@@ -4,18 +4,17 @@
 
 Personal Agent 是一个本地运行的私人 AI 助手，以用户编辑的 `profile.json` 为数据源，提供三大核心功能：Dashboard（看板）、人生抉择器（Life Decision Maker）、简历页（Public Profile）。所有数据本地存储，AI 模型通过 `.env` 自由配置。
 
-**架构模式**：前端 SPA（React + Vite）+ 后端 API Server（Express），前后端分离。
+**核心定位**：这不是一个带 AI 接口的后台系统，而是一个 **Agent 系统** — Agent 是第一公民，所有功能通过 Agent 的能力（规划、工具调用、记忆、子 Agent）驱动。
 
 ## 2. 功能范围
 
 | 模块 | MVP 范围 | Phase 2 | Phase 3 |
 |------|----------|---------|---------|
 | Dashboard | 基本信息卡片、当前状态、工作经历、技能列表、近期动态 | 技能雷达图、时间线可视化、模块显隐配置 | 主题切换、多语言 |
-| 人生抉择器 | 输入抉择→AI 分析→追问 | 决策历史记录保存与回顾 | — |
-| 简历页 | 静态信息展示 + AI 对话窗口 | public/private 字段过滤 | — |
+| 人生抉择器 | 输入抉择→Agent 分析→追问 | 决策历史记录保存与回顾 | — |
+| 简历页 | 静态信息展示 + Agent 对话窗口 | public/private 字段过滤 | — |
 | 数据编辑器 | 表单编辑 + 原始 JSON 查看 | 保存到 profile.json | 完整可视化编辑 UI |
-| 数据层 | profile.json 读写 | visibility 过滤逻辑 | — |
-| AI 层 | OpenAI / Anthropic / Ollama / Gemini 统一接口 | — | — |
+| Agent 系统 | DeepAgents Runtime + 自定义 Tools + Profile 知识注入 | 决策记忆持久化、会话管理 | 多 Agent 协作 |
 
 ## 3. 技术架构
 
@@ -29,42 +28,76 @@ Personal Agent 是一个本地运行的私人 AI 助手，以用户编辑的 `pr
 | 动画 | motion (Framer Motion) | v12 | 已有页面过渡和卡片动画 |
 | 图标 | lucide-react | — | 已统一使用 |
 | UI 组件 | 手写组件 + Material Design 3 色彩体系 | — | 保持现有暗色科技风格 |
-| 后端框架 | Express | v4 | API Server，提供 REST 接口 |
+| Agent Runtime | DeepAgents (LangChain) | deepagentsjs | 规划、工具、子Agent、记忆开箱即用 |
+| Agent 框架 | LangGraph | @langchain/langgraph | 流式、持久化、检查点 |
+| HTTP 层 | Express | v4 | 暴露 API，托管前端静态文件 |
 | 数据库 | SQLite (better-sqlite3) | — | 本地文件，无需安装服务 |
-| AI 模型层 | 统一 LLM 接口 | — | 支持多 provider |
 | 运行时 | Node.js | — | 前后端统一 |
 
 ### 3.2 整体架构
 
 ```
-┌─────────────────────────────────────────────┐
-│                Browser (SPA)                │
-│  ┌─────────┐ ┌──────────┐ ┌──────────────┐  │
-│  │Dashboard│ │Decision  │ │Public Profile │  │
-│  │  View   │ │Maker View│ │    View       │  │
-│  └────┬────┘ └────┬─────┘ └──────┬───────┘  │
-│       │           │              │           │
-│  ┌────▼───────────▼──────────────▼────────┐  │
-│  │          API Client (fetch)            │  │
-│  └────────────────┬──────────────────────┘  │
-└───────────────────┼─────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│                  Browser (SPA)                   │
+│  ┌─────────┐ ┌───────────┐ ┌─────────────────┐  │
+│  │Dashboard│ │ Decision  │ │  Public Profile  │  │
+│  │  View   │ │Maker View │ │     View         │  │
+│  └────┬────┘ └─────┬─────┘ └───────┬─────────┘  │
+│       │             │               │            │
+│  ┌────▼─────────────▼───────────────▼──────────┐ │
+│  │            API Client (fetch)               │ │
+│  └────────────────┬───────────────────────────┘ │
+└───────────────────┼─────────────────────────────┘
                     │ HTTP (localhost:3001)
-┌───────────────────▼─────────────────────────┐
-│            Express API Server               │
-│  ┌──────────┐ ┌────────┐ ┌──────────────┐  │
-│  │ Profile  │ │Decision│ │    Chat      │  │
-│  │ Routes   │ │ Routes │ │   Routes     │  │
-│  └────┬─────┘ └───┬────┘ └──────┬───────┘  │
-│       │           │             │           │
-│  ┌────▼───────────▼─────────────▼────────┐  │
-│  │          LLM Provider Layer           │  │
-│  │  (OpenAI / Anthropic / Ollama /Gemini)│  │
-│  └──────────────────────────────────────┘  │
-│  ┌──────────────┐  ┌───────────────────┐   │
-│  │ profile.json │  │ SQLite (decisions,│   │
-│  │   (读取)     │  │  chat_sessions)   │   │
-│  └──────────────┘  └───────────────────┘   │
-└─────────────────────────────────────────────┘
+┌───────────────────▼─────────────────────────────┐
+│              Express (HTTP Layer)                │
+│  ┌──────────────────────────────────────────┐   │
+│  │        API Routes (thin adapter)         │   │
+│  │  profile │ decisions │ chat │ agent      │   │
+│  └──────────────┬───────────────────────────┘   │
+└─────────────────┼───────────────────────────────┘
+                  │ delegates to
+┌─────────────────▼───────────────────────────────┐
+│          DeepAgents Runtime (Core)               │
+│                                                  │
+│  ┌────────────────────────────────────────────┐ │
+│  │           Personal Agent                   │ │
+│  │  ┌──────────────┐  ┌───────────────────┐  │ │
+│  │  │ System Prompt│  │  Profile Knowledge │  │ │
+│  │  │ (角色定义)    │  │  (profile.json)    │  │ │
+│  │  └──────────────┘  └───────────────────┘  │ │
+│  │                                            │ │
+│  │  Built-in Capabilities:                    │ │
+│  │  ✓ Planning (write_todos)                  │ │
+│  │  ✓ Filesystem (read/write/edit/ls/grep)    │ │
+│  │  ✓ Sub-agents (task delegation)            │ │
+│  │  ✓ Context management (summarization)      │ │
+│  │  ✓ Memory (cross-session persistence)      │ │
+│  │                                            │ │
+│  │  Custom Tools:                             │ │
+│  │  ┌──────────────┐  ┌────────────────────┐  │ │
+│  │  │read_profile  │  │save_decision       │  │ │
+│  │  │query_decisions│  │filter_public_info  │  │ │
+│  │  └──────────────┘  └────────────────────┘  │ │
+│  │                                            │ │
+│  │  Sub-agents:                               │ │
+│  │  ┌──────────────┐  ┌────────────────────┐  │ │
+│  │  │Decision Agent│  │  Profile Agent     │  │ │
+│  │  │(抉择分析)     │  │  (简历页问答)       │  │ │
+│  │  └──────────────┘  └────────────────────┘  │ │
+│  └────────────────────────────────────────────┘ │
+│                                                  │
+│  ┌──────────────┐  ┌────────────────────────┐   │
+│  │ LangGraph    │  │  SQLite Checkpointer   │   │
+│  │ (状态图引擎) │  │  (会话/决策持久化)      │   │
+│  └──────────────┘  └────────────────────────┘   │
+│                                                  │
+│  ┌──────────────┐  ┌────────────────────────┐   │
+│  │profile.json  │  │  LLM Provider          │   │
+│  │(知识源)      │  │  (OpenAI/Anthropic/    │   │
+│  │              │  │   Ollama/Gemini)        │   │
+│  └──────────────┘  └────────────────────────┘   │
+└─────────────────────────────────────────────────┘
 ```
 
 ### 3.3 开发与部署
@@ -75,9 +108,296 @@ Personal Agent 是一个本地运行的私人 AI 助手，以用户编辑的 `pr
   - `npm run dev` — 前后端同时启动（concurrently）
   - `npm run build && npm start` — 生产模式
 
-## 4. 数据模型
+## 4. Agent 架构（核心）
 
-### 4.1 ProfileData（用户个人信息）
+### 4.1 为什么用 DeepAgents
+
+传统做法是在 Express route 里拼 prompt + 调 LLM，这有几个问题：
+- 没有规划能力，复杂任务（多轮追问、多步骤决策）无法拆解
+- 没有上下文管理，对话长了就爆 context window
+- 没有持久化，重启丢失所有会话状态
+- 没有子 Agent，所有逻辑堆在一个 prompt 里
+- 每个功能各写一套 LLM 调用，重复且不可组合
+
+DeepAgents 解决了这些问题：它基于 LangGraph 提供了规划、文件系统、子 Agent、记忆、上下文压缩等开箱即用的能力，我们只需定义 **自定义 Tools** 和 **子 Agent**，让 Agent 自主决定如何使用它们。
+
+### 4.2 Agent 层级设计
+
+```
+                    Personal Agent (主 Agent)
+                    ├─ system: "你是 {name} 的私人 AI 助手"
+                    ├─ knowledge: profile.json 全量注入
+                    ├─ built-in: planning, filesystem, summarization
+                    │
+                    ├─ Sub-agent: Decision Agent
+                    │  ├─ system: "你是人生决策顾问"
+                    │  ├─ knowledge: values, goals, decisions_context
+                    │  ├─ tools: [save_decision, query_decisions]
+                    │  └─ response_format: DecisionAnalysis schema
+                    │
+                    └─ Sub-agent: Profile Agent
+                       ├─ system: "你是 {name} 的对外代表"
+                       ├─ knowledge: filter_public(profile)
+                       ├─ tools: [filter_public_info]
+                       └─ constraints: 不透露 private 信息
+```
+
+**设计原则**：
+- **主 Agent 是协调者**：接收用户/访客请求，判断路由到哪个子 Agent
+- **子 Agent 是专家**：每个子 Agent 有独立的 system prompt、知识范围和工具集
+- **知识通过 memory 注入**：profile.json 内容作为 Agent Memory 加载，而非硬编码到 prompt
+- **安全边界在工具层**：private 信息不是靠 prompt 约束，而是靠工具不返回
+
+### 4.3 主 Agent 创建
+
+```typescript
+import { createDeepAgent, createSubAgentMiddleware } from "deepagents";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { readProfileTool, saveDecisionTool, queryDecisionsTool, filterPublicInfoTool } from "./tools";
+import { decisionAgent, profileAgent } from "./subagents";
+
+const agent = createDeepAgent({
+  model: process.env.LLM_MODEL || "anthropic:claude-sonnet-4-5-20250929",
+  systemPrompt: `你是 {name} 的私人 AI 助手。你可以帮助 {name} 管理个人信息、
+分析人生抉择、以及代表 {name} 向访客介绍自己。
+当用户提出抉择类问题时，使用 task 工具委派给 decision_agent。
+当访客提问关于 {name} 的问题时，使用 task 工具委派给 profile_agent。`,
+  memory: ["./data/AGENTS.md"],        // profile 摘要作为长期记忆
+  tools: [readProfileTool],            // 读取完整 profile 的工具
+  subagents: [
+    decisionAgent,
+    profileAgent,
+  ],
+  checkpointer: sqliteCheckpointer,    // 会话持久化
+});
+```
+
+### 4.4 子 Agent 定义
+
+#### Decision Agent（抉择分析）
+
+```typescript
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+
+const decisionAgent: SubAgent = {
+  name: "decision_agent",
+  description: "分析人生抉择，基于用户的价值观和目标给出结构化利弊分析和建议",
+  middleware: [
+    createDecisionMiddleware(),         // 注入决策上下文到 Agent state
+  ],
+};
+
+// Decision Middleware: 将 values/goals/decisions_context 注入 Agent 状态
+function createDecisionMiddleware() {
+  return createMiddleware({
+    name: "DecisionContextMiddleware",
+    stateSchema: z.object({
+      values: z.array(z.string()).default([]),
+      current_goal: z.string().default(""),
+      decisions_context: z.string().default(""),
+    }),
+  });
+}
+```
+
+#### Profile Agent（简历页问答）
+
+```typescript
+const profileAgent: SubAgent = {
+  name: "profile_agent",
+  description: "代表用户回答访客关于职业、技能、经历的问题",
+  middleware: [
+    createProfileMiddleware(),          // 注入公开 profile 到 Agent state
+  ],
+};
+
+// Profile Middleware: 将过滤后的公开信息注入 Agent 状态
+function createProfileMiddleware() {
+  return createMiddleware({
+    name: "ProfileContextMiddleware",
+    stateSchema: z.object({
+      public_profile: z.record(z.any()).default({}),
+    }),
+  });
+}
+```
+
+### 4.5 自定义 Tools
+
+#### read_profile — 读取完整个人信息
+
+```typescript
+const readProfileTool = tool(async ({ section }, runConfig) => {
+  const profile = getProfile();         // 从 profile.json 读取
+  if (section && profile[section]) {
+    return JSON.stringify(profile[section]);
+  }
+  return JSON.stringify(profile);
+}, {
+  name: "read_profile",
+  description: "读取用户的个人信息。可指定 section: basic/experiences/skills/values/current_goals/decisions_context",
+  schema: z.object({
+    section: z.string().optional().describe("要读取的 section 名称"),
+  }),
+});
+```
+
+#### save_decision — 保存决策记录
+
+```typescript
+const saveDecisionTool = tool(async ({ question, analysis }) => {
+  const id = crypto.randomUUID();
+  saveDecisionToDB(id, question, analysis);
+  return `决策已保存，ID: ${id}`;
+}, {
+  name: "save_decision",
+  description: "保存一次决策分析结果，供未来回顾",
+  schema: z.object({
+    question: z.string().describe("用户的抉择问题"),
+    analysis: z.string().describe("AI 的完整分析"),
+  }),
+});
+```
+
+#### query_decisions — 查询历史决策
+
+```typescript
+const queryDecisionsTool = tool(async ({ keyword }) => {
+  const decisions = keyword
+    ? searchDecisionsByKeyword(keyword)
+    : getRecentDecisions(10);
+  return JSON.stringify(decisions);
+}, {
+  name: "query_decisions",
+  description: "查询历史决策记录，可按关键词搜索",
+  schema: z.object({
+    keyword: z.string().optional().describe("搜索关键词"),
+  }),
+});
+```
+
+#### filter_public_info — 过滤公开信息
+
+```typescript
+const filterPublicInfoTool = tool(async ({ query }) => {
+  const publicProfile = getPublicProfile();  // 按 visibility 过滤
+  return JSON.stringify(publicProfile);
+}, {
+  name: "filter_public_info",
+  description: "获取用户公开可见的个人信息（已过滤 private 字段），用于回答访客问题",
+  schema: z.object({
+    query: z.string().optional().describe("访客的具体问题，用于定向提取相关信息"),
+  }),
+});
+```
+
+### 4.6 Agent 执行流程
+
+#### 人生抉择流程
+
+```
+用户: "我在考虑是否要从大厂跳槽去创业公司"
+  │
+  ▼
+主 Agent (Personal Agent)
+  ├─ 识别为抉择类问题 → 调用 task("decision_agent", ...)
+  │
+  ▼
+Decision Agent
+  ├─ 读取 values: ["自主性", "持续学习", "有影响力的工作"]
+  ├─ 读取 current_goals: "在 AI 方向深耕，寻找 0-1 产品机会"
+  ├─ 读取 decisions_context: "..."
+  ├─ 调用 read_profile("experiences") 了解工作背景
+  ├─ 分析利弊 → 生成 DecisionAnalysis
+  ├─ 调用 save_decision 保存记录
+  └─ 返回结构化分析
+  │
+  ▼
+主 Agent → 将结果返回给前端
+```
+
+#### 简历页对话流程
+
+```
+访客: "你最擅长什么技术方向？"
+  │
+  ▼
+主 Agent (Personal Agent)
+  ├─ 识别为访客提问 → 调用 task("profile_agent", ...)
+  │
+  ▼
+Profile Agent
+  ├─ 调用 filter_public_info 获取公开信息
+  ├─ 基于 skills: React(0.92), Node.js(0.88)...
+  ├─ 基于 experiences: 全栈开发经历...
+  └─ 返回自然语言回答
+  │
+  ▼
+主 Agent → 将结果返回给前端
+```
+
+### 4.7 结构化输出（抉择分析）
+
+Decision Agent 使用 DeepAgents 的 `responseFormat` 强制结构化输出：
+
+```typescript
+import { toolStrategy } from "langchain";
+
+const decisionAnalysisSchema = z.object({
+  pros: z.array(z.string()).describe("该选择的利"),
+  cons: z.array(z.string()).describe("该选择的弊"),
+  alignment: z.number().min(0).max(100).describe("与用户价值观的匹配度"),
+  summary: z.string().describe("综合建议"),
+});
+
+// 在创建抉择子 Agent 时使用
+const structuredDecisionAgent = createDeepAgent({
+  systemPrompt: "你是人生决策顾问...",
+  responseFormat: toolStrategy(decisionAnalysisSchema),
+  // ...
+});
+```
+
+### 4.8 记忆与持久化
+
+| 层次 | 机制 | 用途 |
+|------|------|------|
+| Agent Memory | `memory: ["./data/AGENTS.md"]` | profile 摘要注入 system prompt，跨会话 |
+| 会话持久化 | LangGraph Checkpointer (SQLite) | 多轮对话状态保存，重启可恢复 |
+| 决策历史 | `save_decision` Tool + SQLite | 决策记录持久化，可回顾查询 |
+| 上下文压缩 | DeepAgents 内置 summarization middleware | 长对话自动压缩，防 context window 溢出 |
+
+**AGENTS.md**（由 profile.json 自动生成或用户手动编写）：
+
+```markdown
+# Personal Agent Memory
+
+## 基本信息
+- 姓名：张三
+- 职位：全栈工程师
+- 所在城市：上海
+- 简介：热爱开源，专注 AI 应用开发
+
+## 核心价值观
+- 自主性
+- 持续学习
+- 有影响力的工作
+
+## 当前目标
+在 AI 方向深耕，寻找 0-1 产品机会
+
+## 工作经历
+- 某公司 (2022-至今): 高级工程师，主导核心服务重构
+- Tech Startup (2018-2022): 后端开发
+
+## 核心技能
+- React (92%), Node.js (88%), Python/ML (85%)
+```
+
+## 5. 数据模型
+
+### 5.1 ProfileData（用户个人信息）
 
 基于现有 `src/types.ts` 扩展，增加 PRD 要求的 visibility、values、decisions_context 字段：
 
@@ -93,9 +413,9 @@ interface Experience {
   period: string;
   role: string;
   description: string;
-  highlights?: string[];            // PRD 要求
-  reason_for_leaving?: string;      // PRD 要求，仅供 Agent 回答
-  active?: boolean;                 // 标记当前工作
+  highlights?: string[];
+  reason_for_leaving?: string;      // 仅供 Agent 回答，不公开
+  active?: boolean;
   visibility: "public" | "private";
 }
 
@@ -120,8 +440,8 @@ interface ProfileData {
   email: string;
   github: string;
   avatar: string;
-  bio: string;                      // 一句话简介
-  contact?: ContactInfo;            // PRD 要求的可控联系方式
+  bio: string;
+  contact?: ContactInfo;
   currentFocus: {
     title: string;
     description: string;
@@ -130,20 +450,15 @@ interface ProfileData {
   skills: Skill[];
   experiences: Experience[];
   recentDynamics: DynamicLog[];
-  values: string[];                 // PRD：价值观
-  current_goals: string;            // PRD：当前目标
-  decisions_context: string;        // PRD：决策上下文
+  values: string[];
+  current_goals: string;
+  decisions_context: string;
 }
 ```
 
-### 4.2 DecisionContext & DecisionAnalysis
+### 5.2 DecisionAnalysis
 
 ```typescript
-interface DecisionContext {
-  coreValues: string[];
-  currentGoal: string;
-}
-
 interface DecisionAnalysis {
   pros: string[];
   cons: string[];
@@ -152,7 +467,7 @@ interface DecisionAnalysis {
 }
 ```
 
-### 4.3 SQLite 表结构
+### 5.3 SQLite 表结构
 
 ```sql
 -- 决策历史
@@ -163,31 +478,25 @@ CREATE TABLE decisions (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 简历页对话会话
-CREATE TABLE chat_sessions (
-  id TEXT PRIMARY KEY,
-  visitor_id TEXT,
-  messages TEXT NOT NULL,           -- JSON array of {role, content}
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- LangGraph Checkpointer 使用 SQLite 持久化 Agent 状态
+-- 由 @langchain/langgraph-checkpoint-sqlite 自动管理
 ```
 
-### 4.4 错误码定义
+### 5.4 错误码定义
 
 | 错误码 | 含义 | 场景 |
 |--------|------|------|
 | 400 | 请求参数错误 | 缺少必填字段 |
 | 404 | 资源未找到 | profile.json 不存在、用户不存在 |
 | 422 | 数据格式错误 | profile.json 解析失败 |
-| 500 | 服务内部错误 | LLM 调用失败、数据库异常 |
+| 500 | 服务内部错误 | Agent 调用失败、数据库异常 |
 
-## 5. 接口设计
+## 6. 接口设计
 
-### 5.1 获取个人信息
+### 6.1 获取个人信息
 
 - **URL**：`GET /api/profile`
-- **描述**：返回完整个人信息，供 Dashboard 和抉择器使用
+- **描述**：返回完整个人信息，供 Dashboard 使用
 - **请求参数**：无
 - **响应示例**：
 
@@ -211,7 +520,7 @@ CREATE TABLE chat_sessions (
 }
 ```
 
-### 5.2 获取公开个人信息
+### 6.2 获取公开个人信息
 
 - **URL**：`GET /api/profile/[username]`
 - **描述**：返回过滤后的公开信息，供简历页使用
@@ -221,96 +530,60 @@ CREATE TABLE chat_sessions (
 |------|------|------|------|
 | username | string | 是 | URL 路径参数 |
 
-- **响应示例**：
-
-```json
-{
-  "code": 0,
-  "data": {
-    "name": "张三",
-    "role": "全栈工程师",
-    "location": "上海",
-    "bio": "热爱开源，专注 AI 应用开发",
-    "avatar": "/avatar.jpg",
-    "skills": [...],
-    "experiences": [
-      {
-        "company": "某公司",
-        "role": "高级工程师",
-        "period": "2022-2024",
-        "description": "...",
-        "highlights": ["主导重构了核心服务"]
-      }
-    ]
-  }
-}
-```
-
 - **过滤规则**：
   - `contact.visibility === "private"` 时，不返回 contact 字段
   - `experience.visibility === "private"` 时，不返回该条经历
   - `reason_for_leaving` 不在公开接口返回
-  - `values`、`current_goals`、`decisions_context`、`currentFocus` 不在公开接口返回
-  - `recentDynamics` 不在公开接口返回（内部信息）
+  - `values`、`current_goals`、`decisions_context`、`currentFocus`、`recentDynamics` 不在公开接口返回
 
-### 5.3 人生抉择分析
+### 6.3 Agent 对话（统一入口）
 
-- **URL**：`POST /api/decisions`
-- **描述**：用户提交抉择问题，AI 结合个人背景返回结构化分析
+- **URL**：`POST /api/agent`
+- **描述**：与 Personal Agent 对话的统一入口，Agent 自动路由到对应子 Agent
 - **请求参数**：
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| question | string | 是 | 抉择描述 |
-| session_id | string | 否 | 已有会话 ID，用于多轮追问 |
+| message | string | 是 | 用户/访客消息 |
+| thread_id | string | 否 | LangGraph thread ID，用于多轮对话持久化 |
+| mode | string | 否 | `"decision"` / `"profile"` / `"auto"`，默认 auto |
 
 - **请求示例**：
 
 ```json
 {
-  "question": "我在考虑是否要从大厂跳槽去创业公司",
-  "session_id": "abc123"
+  "message": "我在考虑是否要从大厂跳槽去创业公司",
+  "thread_id": "thread_abc123",
+  "mode": "auto"
 }
 ```
 
-- **响应示例**：
-
-```json
-{
-  "code": 0,
-  "data": {
-    "session_id": "abc123",
-    "analysis": {
-      "pros": ["接触更多 0-1 机会", "更大的决策权"],
-      "cons": ["收入不确定性", "工作强度大"],
-      "alignment": 72,
-      "summary": "基于你重视自主性和有影响力的工作，创业公司与你价值观匹配度较高，但需注意财务稳定性..."
-    }
-  }
-}
-```
-
-- **AI System Prompt**：
+- **响应（流式 SSE）**：
 
 ```
-你是一位人生决策顾问。你将基于用户的个人信息帮助其分析当前抉择。
+event: metadata
+data: {"thread_id": "thread_abc123", "mode": "decision"}
 
-用户背景：
-- 价值观：{values}
-- 当前目标：{current_goals}
-- 人生阶段与上下文：{decisions_context}
-- 工作经历：{experience_summary}
+event: token
+data: {"content": "基于"}
 
-原则：
-1. 不给出"正确答案"，而是帮助用户梳理优先级
-2. 每个选项列出利弊，并与用户价值观和目标做匹配度评估
-3. 最终给出倾向性建议，但保留用户自主决策空间
-4. 使用中文回复
+event: token
+data: {"content": "你的价值观和目标"}
 
-请以 JSON 格式返回：{ "pros": string[], "cons": string[], "alignment": number, "summary": string }
+event: tool_call
+data: {"tool": "read_profile", "args": {"section": "experiences"}}
+
+event: tool_result
+data: {"tool": "read_profile", "result": "..."}
+
+event: token
+data: {"content": "## 利弊分析\n\n### 留在大厂\n**利**：..."}
+
+event: end
+data: {"structured_response": {"pros": [...], "cons": [...], "alignment": 72, "summary": "..."}}
 ```
 
-### 5.4 获取决策历史
+### 6.4 获取决策历史
 
 - **URL**：`GET /api/decisions`
 - **描述**：返回历史决策记录列表
@@ -330,7 +603,7 @@ CREATE TABLE chat_sessions (
 }
 ```
 
-### 5.5 获取决策详情
+### 6.5 获取决策详情
 
 - **URL**：`GET /api/decisions/[id]`
 - **描述**：返回某次决策的完整分析
@@ -348,59 +621,10 @@ CREATE TABLE chat_sessions (
 }
 ```
 
-### 5.6 简历页 AI 对话
-
-- **URL**：`POST /api/chat`
-- **描述**：访客在简历页与 AI Agent 对话
-- **请求参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| message | string | 是 | 访客提问 |
-| session_id | string | 否 | 已有会话 ID，用于多轮对话 |
-
-- **请求示例**：
-
-```json
-{
-  "message": "你最擅长什么技术方向？",
-  "session_id": "xyz789"
-}
-```
-
-- **响应示例**：
-
-```json
-{
-  "code": 0,
-  "data": {
-    "session_id": "xyz789",
-    "reply": "张三最擅长的技术方向是 React 和 Node.js 全栈开发，同时在 LLM 应用开发方面有深入实践..."
-  }
-}
-```
-
-- **AI System Prompt**：
-
-```
-你是{name}的个人 AI 助手，代表他/她回答访客的问题。
-
-你可以基于以下公开信息回答：
-{filtered_public_profile}
-
-规则：
-1. 只回答与 {name} 的职业、技能、经历相关的问题
-2. 不得透露任何标记为 private 的信息
-3. 对于敏感问题（如薪资、离职原因等未公开的信息），回复"这个问题请直接联系本人"
-4. 回答要自然、有温度，像一个朋友在介绍 {name}
-5. 如果问题超出已知信息范围，诚实说"这个我不太了解，你可以直接联系 ta"
-6. 使用中文回复
-```
-
-### 5.7 保存个人信息
+### 6.6 保存个人信息
 
 - **URL**：`PUT /api/profile`
-- **描述**：保存编辑后的个人信息到 profile.json
+- **描述**：保存编辑后的个人信息到 profile.json，同时重新生成 AGENTS.md
 - **请求参数**：完整的 ProfileData 对象
 - **响应示例**：
 
@@ -411,9 +635,9 @@ CREATE TABLE chat_sessions (
 }
 ```
 
-## 6. 页面结构与交互逻辑
+## 7. 页面结构与交互逻辑
 
-### 6.1 全局布局
+### 7.1 全局布局
 
 沿用现有 `Layout.tsx` + `Sidebar.tsx` + `TopBar.tsx` 结构：
 
@@ -441,7 +665,7 @@ CREATE TABLE chat_sessions (
 | `/public-profile` | `PublicProfileView` | 简历页预览 |
 | `/data-editor` | `DataEditorView` | 数据编辑器 |
 
-### 6.2 Dashboard
+### 7.2 Dashboard
 
 **页面结构**（沿用现有 Bento Grid）：
 - Profile Card（4 cols）：头像、姓名、职位、城市、邮箱、GitHub
@@ -466,7 +690,7 @@ CREATE TABLE chat_sessions (
 | 错误 | 错误提示 + 重试 | 请求失败 |
 | 空数据 | 引导"请编辑 data/profile.json" | profile 不存在 |
 
-### 6.3 人生抉择器
+### 7.3 人生抉择器
 
 **页面结构**（沿用现有双栏布局）：
 - 左侧 Context Sidebar（320px）：核心价值观标签、当前目标、最近决策
@@ -476,8 +700,8 @@ CREATE TABLE chat_sessions (
 
 | 操作 | 触发条件 | 系统响应 | API 调用 |
 |------|----------|----------|----------|
-| 提交抉择 | 点击发送 / Enter | 显示 loading，调用 AI 分析 | `POST /api/decisions` |
-| 追问 | 在已有结果上继续输入 | 追加 session_id，返回分析 | `POST /api/decisions` |
+| 提交抉择 | 点击发送 / Enter | 显示 loading，流式调用 Agent | `POST /api/agent` (mode=decision) |
+| 追问 | 在已有结果上继续输入 | 同一 thread_id 继续对话 | `POST /api/agent` |
 | 查看历史 | Phase 2：点击左侧历史条目 | 加载决策详情 | `GET /api/decisions/[id]` |
 | 复制分析 | 点击结果卡片复制按钮 | 复制 summary 到剪贴板 | 无 |
 
@@ -491,11 +715,11 @@ CREATE TABLE chat_sessions (
 | 状态 | 表现 | 条件 |
 |------|------|------|
 | 初始 | 输入框 + 引导文案 | 首次进入 |
-| 分析中 | 输入禁用 + Spinner + "Crunching data context..." | AI 生成中 |
-| 分析完成 | 结构化分析卡片 | AI 返回 |
-| 分析失败 | 错误提示 + 重试 | LLM 调用失败 |
+| 分析中 | 输入禁用 + 流式输出 | Agent 生成中 |
+| 分析完成 | 结构化分析卡片 | Agent 返回 |
+| 分析失败 | 错误提示 + 重试 | Agent 调用失败 |
 
-### 6.4 简历页
+### 7.4 简历页
 
 **页面结构**（沿用现有 PublicProfileView）：
 - 头部：头像（带 Active 脉冲动画）、姓名、"Agent Active" 徽章、职位、简介、技能标签
@@ -507,9 +731,9 @@ CREATE TABLE chat_sessions (
 | 操作 | 触发条件 | 系统响应 | API 调用 |
 |------|----------|----------|----------|
 | 页面加载 | 进入 `/public-profile` | 加载公开信息，渲染头部 + 对话窗口 | `GET /api/profile` |
-| 发送消息 | 输入 + 点击发送 | 用户气泡 → AI loading → 回复气泡 | `POST /api/chat` |
-| 点击建议 | 点击预设问题按钮 | 自动填入并发送 | `POST /api/chat` |
-| 重置对话 | 点击重置按钮 | 清空对话历史，恢复初始状态 | 无 |
+| 发送消息 | 输入 + 点击发送 | 用户气泡 → 流式 AI 回复 | `POST /api/agent` (mode=profile) |
+| 点击建议 | 点击预设问题按钮 | 自动填入并发送 | `POST /api/agent` |
+| 重置对话 | 点击重置按钮 | 生成新 thread_id，清空对话 | 无 |
 
 **状态定义**：
 
@@ -517,10 +741,10 @@ CREATE TABLE chat_sessions (
 |------|------|------|
 | 加载中 | 骨架屏 | 信息请求中 |
 | 正常 | 头部 + 对话窗口 | 数据加载成功 |
-| 对话中 | AI 回复加载动画 | AI 生成中 |
+| 对话中 | 流式 AI 回复 | Agent 生成中 |
 | 用户不存在 | 404 页面 | username 未找到 |
 
-### 6.5 数据编辑器
+### 7.5 数据编辑器
 
 **页面结构**（沿用现有 DataEditorView）：
 - Basic Info 表单：agent_name、role、bio_summary（带 public/private 开关）
@@ -532,53 +756,36 @@ CREATE TABLE chat_sessions (
 | 操作 | 触发条件 | 系统响应 | API 调用 |
 |------|----------|----------|----------|
 | 页面加载 | 进入 `/data-editor` | 加载 profile，填充表单 | `GET /api/profile` |
-| 保存 | 点击 "Commit to Disk" | 提交到后端保存 | `PUT /api/profile` |
+| 保存 | 点击 "Commit to Disk" | 提交保存，重新生成 AGENTS.md | `PUT /api/profile` |
 | 丢弃 | 点击 "Discard Changes" | 重置表单为原始数据 | 无 |
 
-## 7. 核心模块设计
+## 8. 核心模块设计
 
-### 7.1 统一 LLM 接口层（server/lib/llm.ts）
+### 8.1 Agent Runtime（server/agent/）
 
 ```typescript
-interface LLMMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
+// server/agent/index.ts — Agent 工厂
+export function createPersonalAgent(config: {
+  profilePath: string;
+  llmProvider: string;
+  llmModel: string;
+  dbPath: string;
+}) {
+  // 加载 profile 作为 memory
+  // 创建 checkpointer (SQLite)
+  // 注册自定义 tools
+  // 定义子 agents
+  // 返回 createDeepAgent(...)
 }
-
-interface LLMOptions {
-  temperature?: number;
-  max_tokens?: number;
-  response_schema?: object;         // 结构化输出 schema
-}
-
-interface LLMProvider {
-  chat(messages: LLMMessage[], options?: LLMOptions): Promise<string>;
-  chatStructured<T>(messages: LLMMessage[], schema: object): Promise<T>;
-}
-
-function createProvider(): LLMProvider;
 ```
 
-**支持的 Provider**：
-
-| Provider | 环境变量 | SDK/方式 |
-|----------|----------|----------|
-| gemini | GEMINI_API_KEY | @google/genai（已有实现） |
-| openai | OPENAI_API_KEY | openai SDK |
-| anthropic | ANTHROPIC_API_KEY | @anthropic-ai/sdk |
-| ollama | OLLAMA_BASE_URL | fetch 调用本地 API |
-
-**迁移策略**：
-- 现有 `src/services/gemini.ts` 中的 `analyzeDecision` 和 `chatWithAgent` 逻辑迁移到后端
-- 前端 `gemini.ts` 改为通用 API Client，调用后端 `/api/decisions` 和 `/api/chat`
-- Gemini 的结构化输出（`responseSchema`）在 LLM 层统一封装
-
-### 7.2 Profile 读取与过滤（server/lib/profile.ts）
+### 8.2 Profile 读取与过滤（server/lib/profile.ts）
 
 ```typescript
 function getProfile(): ProfileData;
 function getPublicProfile(username: string): Partial<ProfileData>;
 function saveProfile(profile: ProfileData): void;
+function generateAgentsMd(profile: ProfileData): string;  // 生成 AGENTS.md
 ```
 
 **过滤逻辑**：
@@ -586,23 +793,17 @@ function saveProfile(profile: ProfileData): void;
 - 检查 `contact.visibility`，private 时移除
 - 移除 `reason_for_leaving`、`values`、`current_goals`、`decisions_context`、`currentFocus`、`recentDynamics`
 
-### 7.3 数据库操作层（server/lib/db.ts）
+### 8.3 数据库操作层（server/lib/db.ts）
 
 ```typescript
 function initDB(): void;
-
-// 决策
 function saveDecision(id: string, question: string, analysis: DecisionAnalysis): void;
 function getDecisions(): DecisionRecord[];
 function getDecisionById(id: string): DecisionRecord | null;
-
-// 对话
-function saveChatSession(id: string, visitorId: string, messages: ChatMessage[]): void;
-function getChatSession(id: string): ChatSession | null;
-function updateChatSession(id: string, messages: ChatMessage[]): void;
+function searchDecisionsByKeyword(keyword: string): DecisionRecord[];
 ```
 
-### 7.4 前端 API Client（src/services/api.ts）
+### 8.4 前端 API Client（src/services/api.ts）
 
 替换现有 `gemini.ts` 的直接调用，改为统一的后端 API Client：
 
@@ -610,23 +811,19 @@ function updateChatSession(id: string, messages: ChatMessage[]): void;
 const API_BASE = "/api";
 
 async function fetchProfile(): Promise<ProfileData>;
-async function fetchPublicProfile(username: string): Promise<Partial<ProfileData>>;
 async function saveProfile(profile: ProfileData): Promise<void>;
 
-async function analyzeDecision(question: string, sessionId?: string): Promise<{
-  sessionId: string;
-  analysis: DecisionAnalysis;
-}>;
+// Agent 对话 — 返回 ReadableStream (SSE)
+function streamAgentChat(message: string, options?: {
+  threadId?: string;
+  mode?: "decision" | "profile" | "auto";
+}): { stream: ReadableStream; threadId: string };
+
 async function fetchDecisions(): Promise<DecisionRecord[]>;
 async function fetchDecisionById(id: string): Promise<DecisionRecord>;
-
-async function chatWithAgent(message: string, sessionId?: string): Promise<{
-  sessionId: string;
-  reply: string;
-}>;
 ```
 
-## 8. 目录结构
+## 9. 目录结构
 
 ```
 personal-agent/
@@ -637,7 +834,7 @@ personal-agent/
 │   ├── constants.ts                # 默认 profile 数据（fallback）
 │   ├── types.ts                    # 类型定义
 │   ├── components/
-│   │   ├── Layout.tsx              # 全局布局（Sidebar + TopBar + Outlet）
+│   │   ├── Layout.tsx              # 全局布局
 │   │   ├── Sidebar.tsx             # 侧边栏导航
 │   │   └── TopBar.tsx              # 顶栏
 │   ├── views/
@@ -646,29 +843,33 @@ personal-agent/
 │   │   ├── PublicProfileView.tsx   # 简历页
 │   │   └── DataEditorView.tsx      # 数据编辑器
 │   └── services/
-│       └── api.ts                  # 后端 API Client（替换 gemini.ts）
-├── server/                         # 后端代码（Express）
+│       └── api.ts                  # 后端 API Client (SSE streaming)
+├── server/                         # 后端代码
 │   ├── index.ts                    # Express 入口 + 静态文件托管
+│   ├── agent/                      # ★ Agent 核心
+│   │   ├── index.ts                # Agent 工厂 (createPersonalAgent)
+│   │   ├── tools/                  # 自定义 Tools
+│   │   │   ├── read-profile.ts     # 读取 profile
+│   │   │   ├── save-decision.ts    # 保存决策
+│   │   │   ├── query-decisions.ts  # 查询历史决策
+│   │   │   └── filter-public.ts    # 过滤公开信息
+│   │   └── subagents/              # 子 Agent 定义
+│   │       ├── decision-agent.ts   # 抉择分析 Agent
+│   │       └── profile-agent.ts    # 简历问答 Agent
 │   ├── routes/
-│   │   ├── profile.ts              # GET/PUT /api/profile, GET /api/profile/:username
-│   │   ├── decisions.ts            # POST/GET /api/decisions, GET /api/decisions/:id
-│   │   └── chat.ts                 # POST /api/chat
+│   │   ├── profile.ts              # GET/PUT /api/profile
+│   │   ├── agent.ts                # POST /api/agent (SSE streaming)
+│   │   └── decisions.ts            # GET /api/decisions
 │   └── lib/
-│       ├── llm.ts                  # 统一 LLM 接口
-│       ├── llm/
-│       │   ├── gemini.ts           # Gemini provider
-│       │   ├── openai.ts           # OpenAI provider
-│       │   ├── anthropic.ts        # Anthropic provider
-│       │   └── ollama.ts           # Ollama provider
 │       ├── db.ts                   # SQLite 操作
-│       ├── profile.ts              # profile.json 读写与过滤
-│       └── prompts.ts              # AI System Prompt 模板
+│       └── profile.ts              # profile.json 读写与过滤
 ├── data/
 │   ├── profile.json                # 用户个人信息
-│   └── profile.example.json        # 示例文件
+│   ├── profile.example.json        # 示例文件
+│   └── AGENTS.md                   # Agent Memory (自动生成)
 ├── public/
-│   └── avatar.jpg                  # 默认头像
-├── vite.config.ts                  # Vite 配置 + API proxy
+│   └── avatar.jpg
+├── vite.config.ts
 ├── package.json
 ├── tsconfig.json
 ├── .env.example
@@ -677,31 +878,29 @@ personal-agent/
 └── README.md
 ```
 
-## 9. 关键配置文件
+## 10. 关键配置文件
 
-### 9.1 .env.example
+### 10.1 .env.example
 
 ```env
-# LLM Provider: gemini | openai | anthropic | ollama
-LLM_PROVIDER=gemini
+# LLM Provider & Model (LangChain init_chat_model 格式)
+# 格式: provider:model_name
+LLM_MODEL=anthropic:claude-sonnet-4-5-20250929
 
-# Gemini
+# API Keys (按需填写)
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
 GEMINI_API_KEY=
 
-# OpenAI
-OPENAI_API_KEY=
-
-# Anthropic
-ANTHROPIC_API_KEY=
-
-# Ollama
-OLLAMA_BASE_URL=http://localhost:11434
+# Ollama (本地模型)
+# LLM_MODEL=ollama:llama3.2
+# OLLAMA_BASE_URL=http://localhost:11434
 
 # Server
 PORT=3001
 ```
 
-### 9.2 vite.config.ts（开发代理）
+### 10.2 vite.config.ts（开发代理）
 
 ```typescript
 import { defineConfig } from "vite";
@@ -721,7 +920,7 @@ export default defineConfig({
 });
 ```
 
-### 9.3 package.json scripts
+### 10.3 package.json scripts
 
 ```json
 {
@@ -735,36 +934,39 @@ export default defineConfig({
 }
 ```
 
-## 10. 边界场景处理
+## 11. 边界场景处理
 
 | 场景 | 处理方式 |
 |------|----------|
-| profile.json 不存在 | Dashboard 和抉择器显示引导提示，简历页返回 404 |
-| profile.json 格式错误 | 返回 422 + 提示用户检查 JSON 格式 |
-| LLM 调用超时 | 前端显示超时提示 + 重试按钮；后端 30s 超时 |
-| LLM 返回异常 | 捕获异常，返回 500 + 通用提示，不暴露内部错误 |
-| 访客提问超出信息边界 | AI 回复"这个问题请直接联系本人" |
-| 访客提问无关问题 | AI 回复"这个我不太了解" |
-| 数据库文件损坏 | 启动时自动重建表，历史数据丢失时提示 |
-| 并发写入 | SQLite WAL 模式，读写不阻塞 |
+| profile.json 不存在 | Dashboard 显示引导提示；Agent 首次调用 read_profile 时返回空，提示用户编辑 |
+| profile.json 格式错误 | 返回 422 + 提示检查 JSON |
+| LLM 调用超时 | 前端显示超时 + 重试；DeepAgents 内置重试机制 |
+| Agent 循环调用 | DeepAgents 内置 max_iterations 限制，超出自动停止 |
+| 访客提问超出信息边界 | filter_public_info 工具不返回 private 数据，Agent 无法泄露 |
+| 访客提问无关问题 | Profile Agent 的 system prompt 约束只回答职业相关问题 |
+| 对话过长 | DeepAgents summarization middleware 自动压缩上下文 |
+| Agent 异常中断 | LangGraph checkpointer 保存状态，可从断点恢复 |
 | 前端 API 不可达 | 检测后端健康状态，显示"请确保 API 服务已启动" |
 
-## 11. 安全设计
+## 12. 安全设计
 
 | 项目 | 策略 |
 |------|------|
-| API Key 保护 | .env 不入 Git（.gitignore 排除），API Key 仅存后端，不暴露给前端 |
-| Prompt 注入 | 对话输入限制 2000 字，System Prompt 明确拒绝越界指令 |
-| 信息泄露 | 公开接口严格按 visibility 过滤，AI Prompt 约束不透露 private 信息 |
+| API Key 保护 | .env 不入 Git，API Key 仅存后端，不暴露给前端 |
+| Prompt 注入 | 对话输入限制 2000 字；Agent 在工具层做边界控制，不依赖 prompt 自我约束 |
+| 信息泄露 | **安全边界在工具层**：`filter_public_info` 只返回 public 字段，Agent 物理上无法获取 private 数据 |
 | 本地访问 | 默认仅监听 localhost，部署文档提醒用户注意访问控制 |
+| Agent 权限 | DeepAgents "trust the LLM" 模型，工具粒度控制权限：Profile Agent 没有 save_decision 工具 |
 | CORS | 开发模式仅允许 localhost:5173，生产模式无 CORS（同源） |
 
-## 12. 性能考量
+## 13. 性能考量
 
 | 项目 | 策略 |
 |------|------|
-| profile.json 读取 | 启动时读取并缓存到内存，文件变更时热更新（fs.watch） |
-| LLM 流式响应 | 抉择器和对话均支持 stream 返回，提升首字响应速度 |
+| profile.json 读取 | 启动时读取并缓存，文件变更时热更新（fs.watch） |
+| Agent 流式响应 | LangGraph streaming + SSE，前端逐 token 渲染 |
+| 上下文管理 | DeepAgents summarization middleware 自动压缩长对话 |
+| 会话恢复 | SQLite checkpointer，重启后可恢复 Agent 状态 |
 | 静态资源 | Vite 构建 + Express 托管，生产模式 gzip |
 | SQLite | WAL 模式 + 单连接复用 |
-| 前端动画 | motion 的 `AnimatePresence` + 懒加载视图组件 |
+| 前端动画 | motion AnimatePresence + 懒加载视图组件 |
