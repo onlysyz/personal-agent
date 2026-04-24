@@ -77,8 +77,10 @@ export interface PublicProfile {
 
 const PROFILE_PATH = process.env.PROFILE_PATH ||
   path.join(__dirname, "../../data/profile.json");
+const AGENTS_MD_PATH = path.join(__dirname, "../../data/AGENTS.md");
 
 let profileCache: ProfileData | null = null;
+let watcher: fs.FSWatcher | null = null;
 
 export function getProfile(): ProfileData | null {
   if (!fs.existsSync(PROFILE_PATH)) {
@@ -93,6 +95,40 @@ export function getProfile(): ProfileData | null {
   }
 }
 
+export function getProfileWithDefault(): ProfileData {
+  const profile = getProfile();
+  if (profile) return profile;
+
+  // Return default profile for development
+  return {
+    name: "张三",
+    role: "全栈工程师",
+    location: "上海",
+    email: "example@example.com",
+    github: "github.com/example",
+    avatar: "/avatar.jpg",
+    bio: "热爱开源，专注 AI 应用开发",
+    currentFocus: {
+      title: "AI 应用深耕",
+      description: "研究本地大模型部署、微调策略",
+      stats: [
+        { label: "活跃线程", value: 0 },
+        { label: "系统健康", value: "100%", highlight: true },
+        { label: "处理 Token", value: "0" }
+      ]
+    },
+    skills: [
+      { name: "React", value: 0.9, color: "primary" },
+      { name: "Node.js", value: 0.85, color: "primary" },
+      { name: "Python", value: 0.8, color: "secondary" }
+    ],
+    experiences: [],
+    values: [],
+    current_goals: "",
+    decisions_context: ""
+  };
+}
+
 export function saveProfile(profile: ProfileData): void {
   const dir = path.dirname(PROFILE_PATH);
   if (!fs.existsSync(dir)) {
@@ -100,6 +136,41 @@ export function saveProfile(profile: ProfileData): void {
   }
   fs.writeFileSync(PROFILE_PATH, JSON.stringify(profile, null, 2), "utf-8");
   profileCache = profile;
+
+  // Sync AGENTS.md
+  syncAgentsMd(profile);
+}
+
+export function syncAgentsMd(profile?: ProfileData): void {
+  const p = profile || getProfile();
+  if (!p) return;
+
+  const agentsMd = generateAgentsMd(p);
+  const dir = path.dirname(AGENTS_MD_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(AGENTS_MD_PATH, agentsMd, "utf-8");
+}
+
+export function watchProfileChanges(callback?: () => void): void {
+  if (watcher) return;
+
+  if (!fs.existsSync(PROFILE_PATH)) return;
+
+  watcher = fs.watch(PROFILE_PATH, (eventType) => {
+    if (eventType === 'change') {
+      profileCache = null; // invalidate cache
+      callback?.();
+    }
+  });
+}
+
+export function stopWatching(): void {
+  if (watcher) {
+    watcher.close();
+    watcher = null;
+  }
 }
 
 export function getPublicProfile(): PublicProfile | null {
