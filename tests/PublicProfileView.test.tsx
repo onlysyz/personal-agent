@@ -63,6 +63,18 @@ describe('PublicProfileView', () => {
     });
   });
 
+  it('renders complete profile header with all info', async () => {
+    await act(async () => {
+      renderPublicProfile();
+    });
+    await waitFor(() => {
+      // Avatar image
+      const avatar = screen.getByRole('img');
+      expect(avatar).toBeInTheDocument();
+      expect(avatar).toHaveAttribute('alt', 'Profile Avatar');
+    });
+  });
+
   it('renders profile name and role', async () => {
     await act(async () => {
       renderPublicProfile();
@@ -88,6 +100,16 @@ describe('PublicProfileView', () => {
     });
     await waitFor(() => {
       expect(screen.getByText(/interactive session/i)).toBeInTheDocument();
+    });
+  });
+
+  it('displays initial AI message in chat', async () => {
+    await act(async () => {
+      renderPublicProfile();
+    });
+    await waitFor(() => {
+      // Initial AI message should show Agent name and [Agent] label
+      expect(screen.getByText(/Test User \[Agent\]/i)).toBeInTheDocument();
     });
   });
 
