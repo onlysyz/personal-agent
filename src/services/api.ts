@@ -2,22 +2,75 @@ import { ProfileData } from "../types";
 
 const API_BASE = "/api";
 
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000;
+
+interface RetryOptions {
+  retries?: number;
+  baseDelayMs?: number;
+  retryOnServerError?: boolean;
+}
+
+async function fetchWithRetry<T>(
+  url: string,
+  options: RequestInit = {},
+  retryOptions: RetryOptions = {}
+): Promise<T> {
+  const {
+    retries = MAX_RETRIES,
+    baseDelayMs = BASE_DELAY_MS,
+    retryOnServerError = true,
+  } = retryOptions;
+
+  let lastError: Error;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, options);
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.code === 0) return json.data;
+        throw new Error(json.error || `API error: ${json.code}`);
+      }
+
+      if (res.status >= 400 && res.status < 500) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      if (res.status >= 500) {
+        lastError = new Error(`HTTP ${res.status}: ${res.statusText}`);
+        if (attempt < retries) {
+          const delay = baseDelayMs * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        continue;
+      }
+
+      lastError = new Error(`HTTP ${res.status}: ${res.statusText}`);
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt === retries) break;
+      const delay = baseDelayMs * Math.pow(2, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError!;
+}
+
 // Profile API
 export async function fetchProfile(): Promise<ProfileData> {
-  const res = await fetch(`${API_BASE}/profile`);
-  const json = await res.json();
-  if (json.code !== 0) throw new Error(json.error || "Failed to fetch profile");
-  return json.data;
+  return fetchWithRetry(`${API_BASE}/profile`);
 }
 
 export async function saveProfile(profile: ProfileData): Promise<void> {
-  const res = await fetch(`${API_BASE}/profile`, {
+  return fetchWithRetry(`${API_BASE}/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(profile),
   });
-  const json = await res.json();
-  if (json.code !== 0) throw new Error(json.error || "Failed to save profile");
 }
 
 // Decisions API
@@ -34,17 +87,11 @@ export interface DecisionRecord {
 }
 
 export async function fetchDecisions(): Promise<DecisionRecord[]> {
-  const res = await fetch(`${API_BASE}/decisions`);
-  const json = await res.json();
-  if (json.code !== 0) throw new Error(json.error || "Failed to fetch decisions");
-  return json.data;
+  return fetchWithRetry(`${API_BASE}/decisions`);
 }
 
 export async function fetchDecisionById(id: string): Promise<DecisionRecord> {
-  const res = await fetch(`${API_BASE}/decisions/${id}`);
-  const json = await res.json();
-  if (json.code !== 0) throw new Error(json.error || "Failed to fetch decision");
-  return json.data;
+  return fetchWithRetry(`${API_BASE}/decisions/${id}`);
 }
 
 // Agent Chat API (SSE streaming)

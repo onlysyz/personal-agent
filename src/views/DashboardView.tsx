@@ -15,7 +15,8 @@ import {
   History,
   GitCommit,
   FileCode,
-  MessagesSquare
+  MessagesSquare,
+  AlertCircle
 } from 'lucide-react';
 import { fetchProfile } from '../services/api';
 import { ProfileData } from '../types';
@@ -23,10 +24,36 @@ import { ProfileData } from '../types';
 export default function DashboardView() {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProfile().then(setProfile).catch(console.error);
-  }, []);
+    fetchProfile()
+      .then(setProfile)
+      .catch((err) => {
+        console.error("Failed to fetch profile:", err);
+        setError(t('common.error'));
+      });
+  }, [t]);
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <div className="bg-error-container/20 border border-error/30 rounded-2xl p-6 max-w-md">
+          <div className="flex items-center gap-3 text-error mb-2">
+            <AlertCircle size={20} />
+            <h3 className="text-lg font-bold">{t('common.error')}</h3>
+          </div>
+          <p className="text-on-surface-variant text-sm">{error}</p>
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-surface-container text-on-surface rounded-lg hover:bg-surface-container-high transition-colors"
+        >
+          {t('common.retry')}
+        </button>
+      </div>
+    );
+  }
 
   if (!profile) {
     return (
