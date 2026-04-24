@@ -1,0 +1,73 @@
+{
+  "name": "张三",
+  "role": "全栈工程师",
+  "location": "上海",
+  "email": "zhangsan@example.com",
+  "github": "github.com/zhangsan",
+  "avatar": "/avatar.jpg",
+  "bio": "热爱开源，专注 AI 应用开发",
+  "contact": {
+    "email": "zhangsan@example.com",
+    "github": "github.com/zhangsan",
+    "visibility": "public"
+  },
+  "currentFocus": {
+    "title": "AI 应用深耕",
+    "description": "研究本地大模型部署、微调策略，以及推理优化",
+    "stats": [
+      { "label": "活跃线程", "value": 14 },
+      { "label": "系统健康", "value": "98%", "highlight": true },
+      { "label": "处理 Token", "value": "2.4m" }
+    ]
+  },
+  "skills": [
+    { "name": "React / 前端", "value": 0.92, "color": "primary" },
+    { "name": "Node.js / 后端", "value": 0.88, "color": "primary" },
+    { "name": "Python / ML", "value": 0.85, "color": "secondary" },
+    { "name": "LLM 应用开发", "value": 0.78, "color": "secondary" },
+    { "name": "DevOps / Docker", "value": 0.70, "color": "primary" }
+  ],
+  "experiences": [
+    {
+      "company": "某公司",
+      "period": "2021 - 至今",
+      "role": "高级全栈工程师",
+      "description": "主导微前端架构转型，集成 AI 工具提升开发效率，部署本地代码辅助模型",
+      "active": true,
+      "visibility": "public"
+    },
+    {
+      "company": "创业公司",
+      "period": "2018 - 2021",
+      "role": "后端开发",
+      "description": "开发可扩展的 Node.js 微服务，日处理千万级请求",
+      "visibility": "public"
+    }
+  ],
+  "recentDynamics": [
+    {
+      "id": "1",
+      "type": "commit",
+      "time": "2 小时前",
+      "title": "本地 Llama 3 微调完成",
+      "description": "在 RTX 4090 上完成优化，编码查询延迟降低 15%"
+    },
+    {
+      "id": "2",
+      "type": "doc",
+      "time": "昨天",
+      "title": "文档更新",
+      "description": "添加 React 19 和 Next.js 14 App Router 指南"
+    },
+    {
+      "id": "3",
+      "type": "session",
+      "time": "3 天前",
+      "title": "架构评审",
+      "description": "参与 45 分钟对话，分析无服务器与容器化部署的权衡"
+    }
+  ],
+  "values": ["自主性", "持续学习", "有影响力的工作"],
+  "current_goals": "在 AI 方向深耕，寻找 0-1 产品机会",
+  "decisions_context": "正在评估职业机会，关注成长空间和技术深度"
+}
