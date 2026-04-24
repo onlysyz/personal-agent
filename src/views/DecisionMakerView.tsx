@@ -22,7 +22,10 @@ export default function DecisionMakerView() {
   const [query, setQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzingStage, setAnalyzingStage] = useState<string>('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string | DecisionAnalysis; error?: boolean }[]>([]);
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string | DecisionAnalysis; error?: boolean }[]>(() => {
+    const saved = localStorage.getItem('decisionMakerMessages');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -54,6 +57,12 @@ export default function DecisionMakerView() {
       mounted = false;
     };
   }, [t]);
+
+  useEffect(() => {
+    const MAX_MESSAGES = 50;
+    const trimmed = messages.slice(-MAX_MESSAGES);
+    localStorage.setItem('decisionMakerMessages', JSON.stringify(trimmed));
+  }, [messages]);
 
   const handleAnalyze = async () => {
     if (!query.trim()) return;

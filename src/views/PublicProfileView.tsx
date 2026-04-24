@@ -26,12 +26,17 @@ export default function PublicProfileView() {
   const [query, setQuery] = useState('');
   const [isChatting, setIsChatting] = useState(false);
   const [analyzingStage, setAnalyzingStage] = useState<string>('');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    {
-      role: 'model',
-      parts: [{ text: t('publicProfile.agentIntro') }]
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
+    const saved = localStorage.getItem('publicProfileChatHistory');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [{ role: 'model', parts: [{ text: t('publicProfile.agentIntro') }] }];
+      }
     }
-  ]);
+    return [{ role: 'model', parts: [{ text: t('publicProfile.agentIntro') }] }];
+  });
   const [error, setError] = useState<string | null>(null);
 
   const threadIdRef = useRef<string | null>(null);
@@ -50,6 +55,12 @@ export default function PublicProfileView() {
       mounted = false;
     };
   }, [t]);
+
+  useEffect(() => {
+    const MAX_HISTORY = 50;
+    const trimmed = chatHistory.slice(-MAX_HISTORY);
+    localStorage.setItem('publicProfileChatHistory', JSON.stringify(trimmed));
+  }, [chatHistory]);
 
   const handleChat = async (directQuery?: string) => {
     const q = directQuery || query;
