@@ -157,4 +157,18 @@ describe('DecisionMakerView', () => {
       expect(textareas.length).toBeGreaterThan(0);
     });
   });
+
+  it('displays error state when API fails', async () => {
+    const { fetchProfile } = await import('../src/services/api');
+    vi.mocked(fetchProfile).mockRejectedValueOnce(new Error('Network error'));
+
+    await act(async () => {
+      renderDecisionMaker();
+    });
+
+    await waitFor(() => {
+      // Error message should appear
+      expect(screen.getByText(/error/i)).toBeInTheDocument();
+    });
+  });
 });
