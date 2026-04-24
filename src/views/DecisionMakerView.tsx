@@ -1,47 +1,75 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  BrainCircuit, 
-  History, 
-  UserSearch, 
-  Edit3, 
-  CheckCircle2, 
-  Send, 
-  Plus, 
-  Minus, 
-  Scale, 
+import {
+  BrainCircuit,
+  History,
+  UserSearch,
+  Edit3,
+  CheckCircle2,
+  Send,
+  Plus,
+  Minus,
+  Scale,
   Copy,
   Terminal,
   Loader2
 } from 'lucide-react';
-import { INITIAL_DECISION_CONTEXT } from '../constants';
-import { analyzeDecision } from '../services/gemini';
-import { DecisionAnalysis } from '../types';
+import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord } from '../services/api';
+import { DecisionAnalysis, ProfileData } from '../types';
 
 export default function DecisionMakerView() {
   const [query, setQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string | DecisionAnalysis }[]>([]);
-  const context = INITIAL_DECISION_CONTEXT;
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    fetchProfile().then(setProfile).catch(console.error);
+    fetchDecisions().then(setDecisions).catch(console.error);
+  }, []);
 
   const handleAnalyze = async () => {
     if (!query.trim()) return;
-    
+
     const userQuery = query;
     setMessages(prev => [...prev, { role: 'user', content: userQuery }]);
     setQuery('');
     setIsAnalyzing(true);
 
     try {
-      const analysis = await analyzeDecision(userQuery, context);
-      setMessages(prev => [...prev, { role: 'ai', content: analysis }]);
+      const { reply, threadId: newThreadId } = await chatWithAgent(userQuery, {
+        threadId: threadId || undefined,
+        mode: 'decision',
+      });
+      if (!threadId) setThreadId(newThreadId);
+
+      // Try parse JSON response for structured analysis
+      try {
+        const match = reply.match(/\{[\s\S]*?\}/);
+        if (match) {
+          const analysis = JSON.parse(match[0]) as DecisionAnalysis;
+          setMessages(prev => [...prev, { role: 'ai', content: analysis }]);
+        } else {
+          setMessages(prev => [...prev, { role: 'ai', content: reply }]);
+        }
+      } catch {
+        setMessages(prev => [...prev, { role: 'ai', content: reply }]);
+      }
     } catch (error) {
       console.error(error);
-      setMessages(prev => [...prev, { role: 'ai', content: "Sorry, I encountered an error during analysis." }]);
+      setMessages(prev => [...prev, { role: 'ai', content: "抱歉，分析过程中遇到错误。" }]);
     } finally {
       setIsAnalyzing(false);
     }
   };
+
+  const context = profile ? {
+    coreValues: profile.values || [],
+    currentGoal: profile.current_goals || "",
+  } : { coreValues: ["Autonomy", "Continuous Learning"], currentGoal: "Loading..." };
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] gap-8">
@@ -50,7 +78,7 @@ export default function DecisionMakerView() {
           <h1 className="text-3xl font-bold text-on-surface">Decision Maker</h1>
           <p className="text-sm text-on-surface-variant mt-1 opacity-70">Analyzing choices against personal context.</p>
         </div>
-        <button className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all">
+        <button onClick={() => setShowHistory(!showHistory)} className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all">
           <History className="w-4 h-4" /> History
         </button>
       </header>
@@ -71,7 +99,7 @@ export default function DecisionMakerView() {
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {context.coreValues.map((val, i) => (
+                  {context.coreValues.map((val: string, i: number) => (
                     <span key={i} className="bg-primary/10 border border-primary/20 text-primary font-mono text-[10px] px-2.5 py-1 rounded-lg">
                       {val}
                     </span>
@@ -92,20 +120,18 @@ export default function DecisionMakerView() {
               <History className="text-on-surface-variant w-5 h-5" /> Recent Decisions
             </h2>
             <ul className="space-y-4">
-              <li className="flex items-start gap-4 p-3 rounded-xl hover:bg-surface-container-highest/40 cursor-pointer transition-all border border-transparent hover:border-outline-variant/10 group">
+              {decisions.length === 0 && (
+                <li className="text-sm text-on-surface-variant">No decisions yet</li>
+              )}
+              {decisions.slice(0, 5).map((d) => (
+                <li key={d.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-surface-container-highest/40 cursor-pointer transition-all border border-transparent hover:border-outline-variant/10 group">
                 <CheckCircle2 className="text-secondary w-4 h-4 shrink-0 mt-0.5" />
                 <div>
-                  <span className="block text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">Decline Startup Offer</span>
-                  <span className="text-[10px] text-on-surface-variant opacity-60">Aligned with: Financial Stability</span>
+                  <span className="block text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">{d.question}</span>
+                  <span className="text-[10px] text-on-surface-variant opacity-60">Aligned: {d.analysis?.alignment || 0}%</span>
                 </div>
               </li>
-              <li className="flex items-start gap-4 p-3 rounded-xl hover:bg-surface-container-highest/40 cursor-pointer transition-all border border-transparent hover:border-outline-variant/10 group">
-                <CheckCircle2 className="text-primary w-4 h-4 shrink-0 mt-0.5" />
-                <div>
-                  <span className="block text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">Start Cloud Cert</span>
-                  <span className="text-[10px] text-on-surface-variant opacity-60">Aligned with: Continuous Learning</span>
-                </div>
-              </li>
+              ))}
             </ul>
           </div>
         </aside>

@@ -14,7 +14,10 @@ export interface Experience {
   period: string;
   role: string;
   description: string;
+  highlights?: string[];
+  reason_for_leaving?: string;
   active?: boolean;
+  visibility?: 'public' | 'private';
 }
 
 export interface DynamicLog {
@@ -32,7 +35,13 @@ export interface ProfileData {
   email: string;
   github: string;
   avatar: string;
-  currentFocus: {
+  bio?: string;
+  contact?: {
+    email: string;
+    github: string;
+    visibility?: 'public' | 'private';
+  };
+  currentFocus?: {
     title: string;
     description: string;
     stats: {
@@ -43,7 +52,10 @@ export interface ProfileData {
   };
   skills: Skill[];
   experiences: Experience[];
-  recentDynamics: DynamicLog[];
+  recentDynamics?: DynamicLog[];
+  values?: string[];
+  current_goals?: string;
+  decisions_context?: string;
 }
 
 export interface DecisionContext {
