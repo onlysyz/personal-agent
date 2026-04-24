@@ -2,6 +2,16 @@ node_modules/
 dist/
 .env
 .env.local
-data/profile.json
-*.db
 .claude/
+
+# Keep example file, ignore actual data
+data/profile.example.json
+data/profile.json
+data/decisions.db
+
+# SQLite WAL files (generated at runtime)
+data/decisions.db-shm
+data/decisions.db-wal
+
+# Agent memory (regenerated at runtime)
+data/AGENTS.md

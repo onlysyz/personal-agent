@@ -60,39 +60,71 @@ export interface StreamOptions {
   mode?: "decision" | "profile" | "auto";
 }
 
+// SSE streaming via fetch POST (EventSource only supports GET)
 export function streamAgentChat(
   message: string,
   options: StreamOptions = {}
 ): { stream: ReadableStream<AgentStreamEvent>; threadId: string } {
-  const params = new URLSearchParams({ message });
-  if (options.threadId) params.set("thread_id", options.threadId);
-  if (options.mode) params.set("mode", options.mode);
-
   const threadId = options.threadId || crypto.randomUUID();
-  params.set("thread_id", threadId);
 
   const stream = new ReadableStream({
     start(controller) {
-      const eventSource = new EventSource(`${API_BASE}/agent?${params.toString()}`);
-
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as AgentStreamEvent;
-          controller.enqueue(data);
-          if (data.type === "end" || data.type === "error") {
-            eventSource.close();
-            controller.close();
+      // Use fetch with POST for SSE streaming
+      fetch(`${API_BASE}/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          thread_id: threadId,
+          mode: options.mode || "auto",
+        }),
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-        } catch {
-          // ignore parse errors
-        }
-      };
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new Error("No response body");
+          }
 
-      eventSource.onerror = () => {
-        controller.enqueue({ type: "error", error: "Connection failed" } as AgentStreamEvent);
-        eventSource.close();
-        controller.close();
-      };
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          function processChunk({ done, value }: { done: boolean; value?: Uint8Array }) {
+            if (done) {
+              controller.close();
+              return;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                try {
+                  const data = JSON.parse(line.slice(6)) as AgentStreamEvent;
+                  controller.enqueue(data);
+                  if (data.type === "end" || data.type === "error") {
+                    controller.close();
+                    return;
+                  }
+                } catch {
+                  // ignore parse errors
+                }
+              }
+            }
+
+            reader.read().then(processChunk);
+          }
+
+          reader.read().then(processChunk);
+        })
+        .catch((err) => {
+          controller.enqueue({ type: "error", error: err.message } as AgentStreamEvent);
+          controller.close();
+        });
     },
   });
 

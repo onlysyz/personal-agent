@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  BrainCircuit,
   History,
   UserSearch,
   Edit3,
@@ -20,15 +19,39 @@ import { DecisionAnalysis, ProfileData } from '../types';
 export default function DecisionMakerView() {
   const [query, setQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string | DecisionAnalysis }[]>([]);
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const [analyzingStage, setAnalyzingStage] = useState<string>('');
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string | DecisionAnalysis; error?: boolean }[]>([]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Use ref for threadId to avoid stale closure in async handleAnalyze
+  const threadIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    fetchProfile().then(setProfile).catch(console.error);
-    fetchDecisions().then(setDecisions).catch(console.error);
+    let mounted = true;
+
+    fetchProfile()
+      .then((data) => {
+        if (mounted) setProfile(data);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch profile:", err);
+        if (mounted) setError("无法加载个人信息，请刷新页面重试。");
+      });
+
+    fetchDecisions()
+      .then((data) => {
+        if (mounted) setDecisions(data);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch decisions:", err);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleAnalyze = async () => {
@@ -38,13 +61,20 @@ export default function DecisionMakerView() {
     setMessages(prev => [...prev, { role: 'user', content: userQuery }]);
     setQuery('');
     setIsAnalyzing(true);
+    setAnalyzingStage('正在连接 AI 服务...');
 
     try {
+      setAnalyzingStage('正在分析您的背景信息...');
       const { reply, threadId: newThreadId } = await chatWithAgent(userQuery, {
-        threadId: threadId || undefined,
+        threadId: threadIdRef.current || undefined,
         mode: 'decision',
       });
-      if (!threadId) setThreadId(newThreadId);
+      // Update threadId ref for follow-up messages
+      if (!threadIdRef.current) {
+        threadIdRef.current = newThreadId;
+      }
+
+      setAnalyzingStage('正在解析分析结果...');
 
       // Try parse JSON response for structured analysis
       try {
@@ -58,11 +88,25 @@ export default function DecisionMakerView() {
       } catch {
         setMessages(prev => [...prev, { role: 'ai', content: reply }]);
       }
-    } catch (error) {
-      console.error(error);
-      setMessages(prev => [...prev, { role: 'ai', content: "抱歉，分析过程中遇到错误。" }]);
+    } catch (err) {
+      console.error(err);
+      setMessages(prev => [...prev, {
+        role: 'ai',
+        content: "网络连接失败，请检查网络后重试。如果问题持续存在，请稍后再试。",
+        error: true
+      }]);
     } finally {
       setIsAnalyzing(false);
+      setAnalyzingStage('');
+    }
+  };
+
+  const handleRetry = () => {
+    const lastUserMsg = messages.filter(m => m.role === 'user').pop();
+    if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+      const content = lastUserMsg.content;
+      setMessages(prev => prev.filter(m => m !== lastUserMsg));
+      setQuery(content);
     }
   };
 
@@ -78,6 +122,11 @@ export default function DecisionMakerView() {
           <h1 className="text-3xl font-bold text-on-surface">Decision Maker</h1>
           <p className="text-sm text-on-surface-variant mt-1 opacity-70">Analyzing choices against personal context.</p>
         </div>
+        {error && (
+          <div className="bg-error-container text-on-error-container px-4 py-2 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
         <button onClick={() => setShowHistory(!showHistory)} className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all">
           <History className="w-4 h-4" /> History
         </button>
@@ -99,11 +148,11 @@ export default function DecisionMakerView() {
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {context.coreValues.map((val: string, i: number) => (
+                  {Array.isArray(context.coreValues) ? context.coreValues.map((val: string, i: number) => (
                     <span key={i} className="bg-primary/10 border border-primary/20 text-primary font-mono text-[10px] px-2.5 py-1 rounded-lg">
-                      {val}
+                      {typeof val === 'string' ? val : JSON.stringify(val)}
                     </span>
-                  ))}
+                  )) : <span className="text-sm text-on-surface-variant">No values set</span>}
                 </div>
               </div>
               <div>
@@ -123,15 +172,22 @@ export default function DecisionMakerView() {
               {decisions.length === 0 && (
                 <li className="text-sm text-on-surface-variant">No decisions yet</li>
               )}
-              {decisions.slice(0, 5).map((d) => (
-                <li key={d.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-surface-container-highest/40 cursor-pointer transition-all border border-transparent hover:border-outline-variant/10 group">
-                <CheckCircle2 className="text-secondary w-4 h-4 shrink-0 mt-0.5" />
-                <div>
-                  <span className="block text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">{d.question}</span>
-                  <span className="text-[10px] text-on-surface-variant opacity-60">Aligned: {d.analysis?.alignment || 0}%</span>
-                </div>
-              </li>
-              ))}
+              {decisions.slice(0, 5).map((d) => {
+                const alignmentValue = typeof d.analysis?.alignment === 'number'
+                  ? d.analysis.alignment
+                  : typeof d.analysis?.alignment === 'object' && d.analysis?.alignment !== null
+                    ? Object.values(d.analysis.alignment as Record<string, number>)[0]
+                    : 0;
+                return (
+                  <li key={d.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-surface-container-highest/40 cursor-pointer transition-all border border-transparent hover:border-outline-variant/10 group">
+                    <CheckCircle2 className="text-secondary w-4 h-4 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="block text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">{d.question}</span>
+                      <span className="text-[10px] text-on-surface-variant opacity-60">Aligned: {alignmentValue}%</span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </aside>
@@ -153,11 +209,23 @@ export default function DecisionMakerView() {
                       <div className="bg-surface-container-high border-l-4 border-outline-variant/50 rounded-r-2xl rounded-bl-2xl p-5 max-w-[85%] text-on-surface text-[15px] leading-relaxed shadow-lg">
                         {typeof msg.content === 'string' ? msg.content : ''}
                       </div>
+                    ) : msg.error ? (
+                      <div className="w-full space-y-4">
+                        <div className="bg-error-container/20 border-l-4 border-error rounded-r-2xl rounded-br-2xl p-6">
+                          <p className="text-on-surface leading-relaxed">{typeof msg.content === 'string' ? msg.content : '发生错误'}</p>
+                        </div>
+                        <button
+                          onClick={handleRetry}
+                          className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors px-4 py-2 rounded-lg hover:bg-surface-container"
+                        >
+                          <Send size={14} /> 重新发送刚才的问题
+                        </button>
+                      </div>
                     ) : (
                       <div className="w-full space-y-6">
                         <div className="bg-surface-container-low border-l-4 border-secondary rounded-r-2xl rounded-br-2xl p-6 shadow-xl relative overflow-hidden">
                           <div className="absolute -left-10 -top-10 w-24 h-24 bg-secondary/5 rounded-full blur-3xl pointer-events-none" />
-                          
+
                           {typeof msg.content === 'string' ? (
                             <p className="text-on-surface leading-relaxed">{msg.content}</p>
                           ) : (
@@ -172,7 +240,11 @@ export default function DecisionMakerView() {
                                     <Plus size={14} className="group-hover:rotate-90 transition-transform" /> Pros
                                   </h3>
                                   <ul className="text-sm text-on-surface-variant space-y-2.5 list-disc pl-5">
-                                    {msg.content.pros.map((pro, i) => <li key={i} className="leading-tight">{pro}</li>)}
+                                    {Array.isArray(msg.content.pros) ? msg.content.pros.map((pro: string | Record<string, unknown>, i: number) => (
+                                      <li key={i} className="leading-tight">
+                                        {typeof pro === 'string' ? pro : JSON.stringify(pro)}
+                                      </li>
+                                    )) : <li className="leading-tight">{String(msg.content.pros)}</li>}
                                   </ul>
                                 </div>
                                 <div className="bg-surface-container border border-outline-variant/20 p-5 rounded-xl hover:border-primary/30 transition-all group">
@@ -180,7 +252,11 @@ export default function DecisionMakerView() {
                                     <Minus size={14} className="group-hover:rotate-180 transition-transform" /> Cons
                                   </h3>
                                   <ul className="text-sm text-on-surface-variant space-y-2.5 list-disc pl-5">
-                                    {msg.content.cons.map((con, i) => <li key={i} className="leading-tight">{con}</li>)}
+                                    {Array.isArray(msg.content.cons) ? msg.content.cons.map((con: string | Record<string, unknown>, i: number) => (
+                                      <li key={i} className="leading-tight">
+                                        {typeof con === 'string' ? con : JSON.stringify(con)}
+                                      </li>
+                                    )) : <li className="leading-tight">{String(msg.content.cons)}</li>}
                                   </ul>
                                 </div>
                               </div>
@@ -188,17 +264,21 @@ export default function DecisionMakerView() {
                               <div className="bg-surface-container border border-outline-variant/20 p-6 rounded-2xl flex items-center justify-between shadow-inner">
                                 <div>
                                   <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant block mb-1.5 opacity-60">Overall Alignment</span>
-                                  <span className="text-2xl font-bold text-on-surface">Moderate ({msg.content.alignment}%)</span>
+                                  <span className="text-2xl font-bold text-on-surface">
+                                    {typeof msg.content.alignment === 'number'
+                                      ? `${msg.content.alignment}%`
+                                      : 'N/A'}
+                                  </span>
                                 </div>
                                 <div className="w-16 h-16 rounded-full border-4 border-secondary/20 flex items-center justify-center relative">
                                   <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-                                    <circle 
-                                      className="text-secondary transition-all duration-1000" 
-                                      cx="32" cy="32" fill="none" r="28" 
-                                      stroke="currentColor" 
+                                    <circle
+                                      className="text-secondary transition-all duration-1000"
+                                      cx="32" cy="32" fill="none" r="28"
+                                      stroke="currentColor"
                                       strokeWidth="4"
                                       strokeDasharray={175}
-                                      strokeDashoffset={175 - (175 * msg.content.alignment / 100)}
+                                      strokeDashoffset={175 - (175 * (typeof msg.content.alignment === 'number' ? msg.content.alignment : 50) / 100)}
                                     />
                                   </svg>
                                   <Scale className="text-secondary w-6 h-6" />
@@ -216,17 +296,44 @@ export default function DecisionMakerView() {
                   </motion.div>
                 ))}
               </AnimatePresence>
-              
+
               {isAnalyzing && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="flex flex-col items-start w-full"
                 >
-                  <div className="bg-surface-container-low border-l-4 border-secondary/50 rounded-r-2xl rounded-br-2xl p-6 shadow-lg flex items-center gap-4">
-                    <Loader2 className="w-5 h-5 text-secondary animate-spin" />
-                    <span className="text-sm font-mono text-secondary animate-pulse uppercase tracking-widest">Crunching data context...</span>
+                  <div className="bg-surface-container-low border-l-4 border-secondary/50 rounded-r-2xl rounded-br-2xl p-6 shadow-lg flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 text-secondary animate-spin" />
+                      <span className="text-sm font-medium text-secondary animate-pulse">
+                        {analyzingStage || '正在思考中...'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-on-surface-variant">
+                      <span className="inline-block w-2 h-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="inline-block w-2 h-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="inline-block w-2 h-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
                   </div>
+                </motion.div>
+              )}
+
+              {!isAnalyzing && messages.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col items-center justify-center py-16 text-center"
+                >
+                  <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mb-6">
+                    <Scale className="w-8 h-8 text-secondary/50" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-on-surface mb-2">开始你的决策分析</h3>
+                  <p className="text-sm text-on-surface-variant max-w-md">
+                    描述你面临的抉择，AI 将基于你的价值观和目标给出结构化分析。
+                    <br />
+                    例如：「我应该去大厂还是创业公司？」
+                  </p>
                 </motion.div>
               )}
             </div>
