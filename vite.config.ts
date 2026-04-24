@@ -22,6 +22,19 @@ export default defineConfig(({mode}) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'motion': ['motion'],
+            'i18n': ['i18next', 'react-i18next'],
+            'ui': ['lucide-react', 'clsx', 'tailwind-merge'],
+          },
+        },
+      },
+      chunkSizeWarningLimit: 500,
+    },
     test: {
       globals: true,
       environment: 'jsdom',
