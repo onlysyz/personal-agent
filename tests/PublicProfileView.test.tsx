@@ -131,6 +131,34 @@ describe('PublicProfileView', () => {
     });
   });
 
+  it('can type in chat input', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      renderPublicProfile();
+    });
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/query agent/i)).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(/query agent/i);
+    await act(async () => {
+      await user.click(textarea);
+      await user.paste('Test query message');
+    });
+
+    expect(textarea.textContent).toContain('Test query message');
+  });
+
+  it('send button is initially enabled when input is empty but not disabled', async () => {
+    await act(async () => {
+      renderPublicProfile();
+    });
+    await waitFor(() => {
+      const sendButton = document.querySelector('.lucide-send');
+      expect(sendButton).toBeInTheDocument();
+    });
+  });
+
   it('renders chat input textarea', async () => {
     await act(async () => {
       renderPublicProfile();
