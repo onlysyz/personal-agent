@@ -1,15 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Terminal,
   Trash2,
   Bot,
   Send,
   History,
-  CircuitBoard,
   GraduationCap,
   Sparkles,
-  Cloud,
   Code2,
   Loader2
 } from 'lucide-react';
@@ -19,22 +16,38 @@ import { ProfileData } from '../types';
 interface ChatMessage {
   role: 'user' | 'model';
   parts: { text: string }[];
+  error?: boolean;
 }
 
 export default function PublicProfileView() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [query, setQuery] = useState('');
   const [isChatting, setIsChatting] = useState(false);
+  const [analyzingStage, setAnalyzingStage] = useState<string>('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'model',
       parts: [{ text: "Hello. I am the digital representative. I have access to his complete resume and professional history. How can I assist you?" }]
     }
   ]);
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Use ref for threadId to avoid stale closure in async handleChat
+  const threadIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    fetchProfile().then(setProfile).catch(console.error);
+    let mounted = true;
+    fetchProfile()
+      .then((data) => {
+        if (mounted) setProfile(data);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch profile:", err);
+        if (mounted) setError("无法加载个人信息，请刷新页面重试。");
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleChat = async (directQuery?: string) => {
@@ -48,19 +61,34 @@ export default function PublicProfileView() {
     setChatHistory(newHistory);
     setQuery('');
     setIsChatting(true);
+    setAnalyzingStage('正在连接 AI 服务...');
 
     try {
+      setAnalyzingStage('正在查询个人信息...');
       const { reply, threadId: newThreadId } = await chatWithAgent(q, {
-        threadId: threadId || undefined,
+        threadId: threadIdRef.current || undefined,
         mode: 'profile',
       });
-      if (!threadId) setThreadId(newThreadId);
+      // Update threadId ref for follow-up messages
+      if (!threadIdRef.current) {
+        threadIdRef.current = newThreadId;
+      }
       setChatHistory([...newHistory, { role: 'model', parts: [{ text: reply }] }]);
-    } catch (error) {
-      console.error(error);
-      setChatHistory([...newHistory, { role: 'model', parts: [{ text: "抱歉，暂时无法回答。" }] }]);
+    } catch (err) {
+      console.error(err);
+      setChatHistory([...newHistory, { role: 'model', parts: [{ text: "网络连接失败，请检查网络后重试。如果问题持续存在，请稍后再试。" }], error: true }]);
     } finally {
       setIsChatting(false);
+      setAnalyzingStage('');
+    }
+  };
+
+  const handleRetry = () => {
+    const lastUserMsg = chatHistory.filter(m => m.role === 'user').pop();
+    if (lastUserMsg && lastUserMsg.parts[0]?.text) {
+      const content = lastUserMsg.parts[0].text;
+      setChatHistory(prev => prev.slice(0, -1)); // Remove last user message
+      setQuery(content);
     }
   };
 
@@ -107,7 +135,7 @@ export default function PublicProfileView() {
             {(profile?.skills || []).slice(0, 3).map((tag, i) => (
               <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container rounded-lg border border-outline-variant/20 font-mono text-[10px] text-on-surface-variant group hover:border-primary/40 transition-colors">
                 <Sparkles size={10} className="group-hover:text-primary transition-colors" />
-                {tag.name}
+                {tag?.name || `Skill ${i + 1}`}
               </span>
             ))}
           </div>
@@ -145,19 +173,57 @@ export default function PublicProfileView() {
                   {chat.role === 'user' ? 'Visitor' : `${profileName} [Agent]`}
                 </span>
               </div>
-              <div className={cn(
-                "text-[15px] leading-relaxed p-4 rounded-2xl shadow-sm",
-                chat.role === 'user' ? "bg-primary/10 text-on-surface rounded-tr-none" : "bg-surface-container-highest/20 text-on-surface rounded-tl-none"
-              )}>
-                {chat.parts[0].text}
-              </div>
+              {chat.error ? (
+                <div className="flex flex-col gap-3">
+                  <div className="bg-error-container/20 border-l-4 border-error text-[15px] leading-relaxed p-4 rounded-2xl text-on-surface">
+                    {chat.parts[0]?.text || '发生错误'}
+                  </div>
+                  <button
+                    onClick={handleRetry}
+                    className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors px-4 py-2 rounded-lg hover:bg-surface-container self-start"
+                  >
+                    <Send size={14} /> 重新发送刚才的问题
+                  </button>
+                </div>
+              ) : (
+                <div className={cn(
+                  "text-[15px] leading-relaxed p-4 rounded-2xl shadow-sm",
+                  chat.role === 'user' ? "bg-primary/10 text-on-surface rounded-tr-none" : "bg-surface-container-highest/20 text-on-surface rounded-tl-none"
+                )}>
+                  {chat.parts[0]?.text || '无内容'}
+                </div>
+              )}
             </motion.div>
           ))}
           {isChatting && (
             <div className="flex flex-col gap-2 self-start items-start border-l-2 border-secondary/20 pl-6">
-               <span className="text-[9px] font-black uppercase tracking-widest text-secondary opacity-50">Thinking...</span>
-               <div className="h-4 w-32 bg-surface-container-highest/20 rounded-full" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-secondary opacity-50">
+                {analyzingStage || '正在思考中...'}
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="h-2 w-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="h-2 w-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
+          )}
+
+          {!isChatting && chatHistory.length === 1 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-12 text-center"
+            >
+              <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mb-6">
+                <Bot className="w-8 h-8 text-secondary/50" />
+              </div>
+              <h3 className="text-lg font-semibold text-on-surface mb-2">Ask me anything about my profile</h3>
+              <p className="text-sm text-on-surface-variant max-w-md">
+                I have access to my complete professional history, skills, and experience.
+                <br />
+                Feel free to ask about my background or specific projects.
+              </p>
+            </motion.div>
           )}
         </div>
 

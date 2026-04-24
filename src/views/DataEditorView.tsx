@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Database,
   Save,
@@ -23,33 +23,51 @@ export default function DataEditorView() {
   const [jsonText, setJsonText] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<string>('');
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+    setLoadingStage('正在加载配置文件...');
     fetchProfile()
       .then((data) => {
-        setProfile(data);
-        setJsonText(JSON.stringify(data, null, 2));
+        if (mounted) {
+          setProfile(data);
+          setJsonText(JSON.stringify(data, null, 2));
+        }
       })
-      .catch(() => {
-        setMessage({ type: 'error', text: 'Failed to load profile' });
+      .catch((err) => {
+        console.error("Failed to fetch profile:", err);
+        if (mounted) setError("无法加载配置文件，请刷新页面重试。");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (mounted) setLoading(false);
+        setLoadingStage('');
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleSave = async () => {
     if (!profile) return;
     setSaving(true);
     setMessage(null);
+    setError(null);
+    setLoadingStage('正在解析 JSON...');
     try {
       const parsed = JSON.parse(jsonText);
+      setLoadingStage('正在保存到磁盘...');
       await saveProfile(parsed);
       setProfile(parsed);
       setMessage({ type: 'success', text: 'Profile saved successfully' });
-    } catch {
-      setMessage({ type: 'error', text: 'Invalid JSON format' });
+    } catch (err) {
+      console.error("Save failed:", err);
+      setError("保存失败：无效的 JSON 格式或服务器错误");
     } finally {
       setSaving(false);
+      setLoadingStage('');
     }
   };
 
@@ -61,8 +79,26 @@ export default function DataEditorView() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={24} className="animate-spin text-secondary" />
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <Loader2 size={32} className="animate-spin text-secondary" />
+        <span className="text-sm text-on-surface-variant">{loadingStage || 'Loading...'}</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <div className="bg-error-container/20 border border-error/30 rounded-2xl p-6 max-w-md">
+          <h3 className="text-lg font-bold text-on-surface mb-2">加载失败</h3>
+          <p className="text-sm text-on-surface-variant mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-on-primary rounded-xl font-medium hover:brightness-110 transition-all"
+          >
+            刷新页面
+          </button>
+        </div>
       </div>
     );
   }
@@ -81,10 +117,16 @@ export default function DataEditorView() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {message && (
-            <span className={`text-sm ${message.type === 'success' ? 'text-secondary' : 'text-red-400'}`}>
-              {message.text}
-            </span>
+          {saving && loadingStage && (
+            <span className="text-sm text-secondary animate-pulse">{loadingStage}</span>
+          )}
+          {message && message.type === 'success' && (
+            <span className="text-sm text-secondary">{message.text}</span>
+          )}
+          {error && (
+            <div className="flex items-center gap-2 bg-error-container/20 border border-error/30 text-error px-4 py-2 rounded-xl">
+              <span className="text-sm">{error}</span>
+            </div>
           )}
           <button
             onClick={handleDiscard}
