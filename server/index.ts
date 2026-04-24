@@ -43,6 +43,13 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: agentReady ? "ok" : "degraded", agent: agentReady });
 });
 
+// Error handling middleware
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("Unhandled error:", err);
+  const status = err.name === "SyntaxError" && "body" in err ? 400 : 500;
+  res.status(status).json({ code: status, error: status === 400 ? "Invalid JSON" : "Internal server error" });
+});
+
 // Serve static files in production
 if (IS_PROD) {
   const distPath = path.join(__dirname, "../dist");
