@@ -23,3 +23,4 @@
 - Node.js / 后端 (88%)
 - Python / ML (85%)
 - LLM 应用开发 (78%)
+- DevOps / Docker (70%)
