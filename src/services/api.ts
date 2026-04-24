@@ -116,10 +116,10 @@ export function streamAgentChat(
               }
             }
 
-            reader.read().then(processChunk);
+            reader!.read().then(processChunk);
           }
 
-          reader.read().then(processChunk);
+          reader!.read().then(processChunk);
         })
         .catch((err) => {
           controller.enqueue({ type: "error", error: err.message } as AgentStreamEvent);

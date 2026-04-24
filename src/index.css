@@ -18,6 +18,10 @@
   --color-secondary: #5de6ff;
   --color-on-secondary: #00363e;
   --color-secondary-container: #00cbe6;
+  --color-error-container: #ffccd5;
+  --color-on-error-container: #680018;
+  --color-error: #ff6b6b;
+  --color-on-error: #ffffff;
   --color-outline: #908fa0;
   --color-outline-variant: #464554;
 }
@@ -39,6 +43,10 @@
   --color-secondary: #00a3bf;
   --color-on-secondary: #ffffff;
   --color-secondary-container: #b3f0ff;
+  --color-error-container: #ffe5e5;
+  --color-on-error-container: #a50009;
+  --color-error: #d32f2f;
+  --color-on-error: #ffffff;
   --color-outline: #858a91;
   --color-outline-variant: #c3c6cd;
 }
@@ -60,6 +68,10 @@
   --color-secondary: var(--color-secondary);
   --color-on-secondary: var(--color-on-secondary);
   --color-secondary-container: var(--color-secondary-container);
+  --color-error-container: var(--color-error-container);
+  --color-on-error-container: var(--color-on-error-container);
+  --color-error: var(--color-error);
+  --color-on-error: var(--color-on-error);
   --color-outline: var(--color-outline);
   --color-outline-variant: var(--color-outline-variant);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
