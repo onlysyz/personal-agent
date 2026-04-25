@@ -97,14 +97,13 @@ function extractJsonAnalysis(text: string): Record<string, unknown> | null {
 // Flatten complex nested structure into string array
 function flattenToStringArray(val: unknown): string[] {
   if (Array.isArray(val)) {
-    const result: string[] = [];
-    for (const item of val) {
-      if (typeof item === 'string') result.push(item);
-      else if (typeof item === 'object' && item !== null) {
-        result.push(...flattenToStringArray(Object.values(item)));
-      }
-    }
-    return result;
+    return val.flatMap(item => flattenToStringArray(item));
+  }
+  if (typeof val === 'string') {
+    return [val];
+  }
+  if (typeof val === 'object' && val !== null) {
+    return Object.values(val).flatMap(v => flattenToStringArray(v));
   }
   return [];
 }
@@ -117,10 +116,28 @@ function extractAlignment(val: unknown): number {
     if (match) return parseInt(match[0], 10);
   }
   if (typeof val === 'object' && val !== null) {
-    const values = Object.values(val).filter((v) => typeof v === 'number');
-    if (values.length > 0) return Math.round(values.reduce((a, b) => a + (b as number), 0) / values.length);
+    const numbers = extractNumbersRecursive(val);
+    if (numbers.length > 0) {
+      return Math.round(numbers.reduce((a, b) => a + b, 0) / numbers.length);
+    }
   }
   return 50;
+}
+
+// Recursively extract all numbers from a nested object/array
+function extractNumbersRecursive(val: unknown): number[] {
+  if (typeof val === 'number') return [val];
+  if (typeof val === 'string') {
+    const match = val.match(/\d+/);
+    return match ? [parseInt(match[0], 10)] : [];
+  }
+  if (Array.isArray(val)) {
+    return val.flatMap(extractNumbersRecursive);
+  }
+  if (typeof val === 'object' && val !== null) {
+    return Object.values(val).flatMap(extractNumbersRecursive);
+  }
+  return [];
 }
 
 // Streaming chat with DeepAgents integration
