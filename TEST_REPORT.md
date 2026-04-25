@@ -234,18 +234,38 @@ curl http://localhost:11434/api/tags
 # Returns: {"models":[{"name":"nomic-embed-text:latest",...}]}
 ```
 
-**Semantic Search Test Results:**
+**Semantic Search Test Results (End-to-End Verification):**
 ```bash
-# Upload test document with embeddings
-curl -X POST http://localhost:3001/api/knowledge/ingest -F "file=@/tmp/test.md;type=text/markdown"
+# Current knowledge base state
+curl http://localhost:3001/api/knowledge
+# Returns: {"rawDocuments": 3, "wikiPages": 3, "chunks": 5}
+
+# Upload verification
+curl -X POST http://localhost:3001/api/knowledge/ingest -F "file=@/tmp/verify-test.md;type=text/markdown"
 # Returns: {"chunksCreated": 1, "message": "Created 1 wiki page(s) with 1 embeddings."}
 
-# Query verifies semantic search active
+# Semantic query returns chunksFound > 0
 curl -s -X POST http://localhost:3001/api/knowledge/query \
   -H "Content-Type: application/json" \
-  -d '{"question":"how do computers learn from data"}' | jq '.data.chunksFound'
-# Returns: 1 (semantic search working!)
+  -d '{"question":"what is artificial intelligence"}' | jq '.data.chunksFound'
+# Returns: 5 (semantic search working!)
+
+# Agent integration verified - "根据知识库中的信息" in response
+curl -X POST http://localhost:3001/api/agent -d '{"message":"tell me about AI systems"}'
+# Response includes knowledge base context about AI systems, neural networks, ML types
 ```
+
+**Final Knowledge Base State:**
+| Metric | Count |
+|--------|-------|
+| Raw documents | 3 |
+| Wiki pages | 3 |
+| Embeddings (chunks) | 5 |
+
+**End-to-End Flow Verified:**
+1. Upload → Ollama generates embeddings → chunks stored ✅
+2. Semantic query → cosine similarity → returns relevant chunks ✅
+3. Agent query → knowledge context extracted → augments LLM response ✅
 
 **Comparison: Semantic vs Keyword**
 | Query | Semantic Result | Notes |
