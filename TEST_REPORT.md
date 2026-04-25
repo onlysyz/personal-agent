@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-26
 **Test Environment:** localhost:3001
-**Status:** Knowledge Base Bugs Fixed, System Cleaned
+**Status:** System Clean, All Knowledge Base Bugs Fixed
 
 ---
 
@@ -94,6 +94,12 @@ Agent Integration → knowledge context appended to system prompt
 **Fix:** Deleted orphaned wiki pages
 **Result:** 67 → 32 wiki pages (now in sync with raw docs)
 
+### Bug 7: Duplicate Router Import - FIXED
+**Problem:** `knowledgeRouter` was incorrectly imported and used twice in server/index.ts
+**Root Cause:** Accidental duplicate import line
+**Fix:** Removed duplicate import, kept single `import knowledgeRouter from "./routes/knowledge-base.js"`
+**Files Changed:** `server/index.ts`
+
 ---
 
 ## 3. Agent Integration
@@ -131,6 +137,18 @@ The agent correctly:
 - Supports separate embedding API config
 - Fields: provider, apiKey, baseUrl, model
 - Embeddings skipped if `apiKey` and `baseUrl` not both set
+
+### Settings UI
+- Settings modal accessible from TopBar Settings button
+- Configurable options: API provider, API key, base URL, model selection
+- Settings persisted to server via `/api/settings` endpoint
+- Agent auto-reloads with new config on save
+
+### Resume Parser
+- Upload resumes (PDF, Markdown, Text) for profile auto-fill
+- LLM extracts: name, role, location, email, GitHub, bio, skills, experiences
+- Parser: `server/lib/resume-parser.ts` uses configurable model (same as agent)
+- Supports both OpenAI and Anthropic providers
 
 ---
 
@@ -180,7 +198,12 @@ data/knowledge/
 
 3. **Add Public Profile Endpoint:**
    - Create `/api/profile/public` route
-   - Return sanitized profile data
+   - Return sanitized profile data for sharing
+
+4. **Full Agent Testing:**
+   - Configure valid API key to test end-to-end agent streaming
+   - Verify knowledge context integration with real LLM responses
+   - Test decision mode with profile-matched alignment scoring
 
 ---
 
