@@ -25,6 +25,15 @@ export function initDB(): void {
       analysis TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      thread_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      mode TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(thread_id);
   `);
 }
 
@@ -77,6 +86,42 @@ export function getDecisionById(id: string): DecisionRecord | null {
     ...row,
     analysis: JSON.parse(row.analysis),
   };
+}
+
+export interface ConversationMessage {
+  id: number;
+  thread_id: string;
+  role: string;
+  content: string;
+  mode: string | null;
+  created_at: string;
+}
+
+export function saveMessage(
+  threadId: string,
+  role: "user" | "assistant",
+  content: string,
+  mode?: string
+): void {
+  const database = getDB();
+  const stmt = database.prepare(
+    "INSERT INTO conversations (thread_id, role, content, mode, created_at) VALUES (?, ?, ?, ?, datetime('now'))"
+  );
+  stmt.run(threadId, role, content, mode || null);
+}
+
+export function getConversation(threadId: string): ConversationMessage[] {
+  const database = getDB();
+  const stmt = database.prepare(
+    "SELECT id, thread_id, role, content, mode, created_at FROM conversations WHERE thread_id = ? ORDER BY created_at ASC"
+  );
+  return stmt.all(threadId) as ConversationMessage[];
+}
+
+export function clearConversation(threadId: string): void {
+  const database = getDB();
+  const stmt = database.prepare("DELETE FROM conversations WHERE thread_id = ?");
+  stmt.run(threadId);
 }
 
 export function searchDecisions(keyword: string): DecisionRecord[] {

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createPersonalAgent } from "../agent/index.js";
 import { getProfile, getPublicProfile } from "../lib/profile.js";
-import { saveDecision } from "../lib/db.js";
+import { saveDecision, saveMessage, getConversation } from "../lib/db.js";
 import { getServerConfig } from "../lib/config.js";
 import { queryWiki } from "../lib/knowledge-base/index.js";
 import { v4 as uuidv4 } from "uuid";
@@ -145,8 +145,9 @@ async function streamWithAgent(
   res: import("express").Response,
   messages: { role: string; content: string }[],
   systemPrompt: string,
-  mode: "decision" | "profile"
-): Promise<void> {
+  mode: "decision" | "profile",
+  threadId: string
+): Promise<string> {
   return new Promise(async (resolve, reject) => {
     try {
       // Get profile for context
@@ -222,7 +223,10 @@ ${JSON.stringify(publicProfile, null, 2)}
         : "";
       const langchainMessages = [
         new SystemMessage(systemPrompt + "\n\n" + contextPrompt + knowledgeSection),
-        ...messages.map((m) => new HumanMessage(m.content)),
+        ...messages.map((m) => m.role === "user"
+          ? new HumanMessage(m.content)
+          : new AIMessage(m.content)
+        ),
       ];
 
       // Full response accumulator for decision mode
@@ -243,6 +247,13 @@ ${JSON.stringify(publicProfile, null, 2)}
           // Send each chunk via SSE
           res.write(`data: ${JSON.stringify({ type: "token", content: chunkText })}\n\n`);
         }
+      }
+
+      // Save user message to conversation history
+      try {
+        saveMessage(threadId, "user", messages[messages.length - 1].content, mode);
+      } catch (e) {
+        console.warn("Failed to save user message:", e);
       }
 
       // For decision mode, parse and save the structured analysis
@@ -267,10 +278,17 @@ ${JSON.stringify(publicProfile, null, 2)}
         }
       }
 
-      resolve();
+      // Save assistant response to conversation history
+      try {
+        saveMessage(threadId, "assistant", fullResponse, mode);
+      } catch (e) {
+        console.warn("Failed to save assistant message:", e);
+      }
+
+      return fullResponse;
     } catch (err) {
       console.error("Streaming error:", err);
-      reject(err);
+      throw err;
     }
   });
 }
@@ -354,13 +372,20 @@ agentRouter.post("/", async (req, res, next) => {
 
     const threadId = parsed.data.thread_id || uuidv4();
 
+    // Get conversation history for thread
+    const history = getConversation(threadId);
+    const historyMessages = history.map(h => ({ role: h.role, content: h.content }));
+
     // Get agent's system prompt
     const agent = createPersonalAgent();
     const agentConfig = (agent as unknown as { config: { configurable: { systemPrompt: string } } }).config;
     const systemPrompt = agentConfig?.configurable?.systemPrompt || "你是用户的AI助手。";
 
+    // Build messages with history + current message
+    const allMessages = [...historyMessages, { role: "user", content: message }];
+
     // Stream with agent
-    await streamWithAgent(res, [{ role: "user", content: message }], systemPrompt, activeMode);
+    await streamWithAgent(res, allMessages, systemPrompt, activeMode, threadId);
 
     // Send end event
     res.write(`data: ${JSON.stringify({ type: "end", thread_id: threadId })}\n\n`);
@@ -368,6 +393,18 @@ agentRouter.post("/", async (req, res, next) => {
   } catch (err) {
     console.error("Agent error:", err);
     next(err);
+  }
+});
+
+// GET /api/agent/conversation/:threadId - Get conversation history
+agentRouter.get("/conversation/:threadId", (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const messages = getConversation(threadId);
+    return res.json({ code: 0, data: messages });
+  } catch (err) {
+    console.error("Failed to get conversation:", err);
+    return res.status(500).json({ code: 500, error: "Failed to get conversation" });
   }
 });
 
