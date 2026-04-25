@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { createPersonalAgent } from "../agent/index.js";
-import { getProfile } from "../lib/profile.js";
-import { getPublicProfile } from "../lib/profile.js";
+import { getProfile, getPublicProfile } from "../lib/profile.js";
 import { saveDecision } from "../lib/db.js";
+import { getServerConfig } from "../lib/config.js";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
@@ -13,21 +13,53 @@ const agentRouter = Router();
 const requestSchema = z.object({
   message: z.string().min(1).max(2000),
   thread_id: z.string().optional(),
-  mode: z.enum(["decision", "profile", "auto"]).default("auto"),
+  mode: z.enum(["decision", "profile", "auto", "onboarding"]).default("auto"),
 });
 
-// Create configured model from env
+// Create configured model from server config (not env)
 async function createModel() {
-  const modelStr = process.env.LLM_MODEL || "anthropic:claude-sonnet-4-5-20250929";
-  const [provider, ...modelParts] = modelStr.split(":");
-  const modelName = modelParts.join(":") || "claude-sonnet-4-5-20250929";
+  const config = getServerConfig();
+  const { provider, model: modelName, apiKey, baseUrl } = config;
+  const timeout = 30000;
 
-  if (provider === "openai") {
+  if (provider === "ollama") {
     const { ChatOpenAI } = await import("@langchain/openai");
-    return new ChatOpenAI({ model: modelName, temperature: 0, streaming: true });
+    return new ChatOpenAI({
+      model: modelName || "llama3.2",
+      temperature: 0,
+      streaming: true,
+      openAIApiKey: "ollama",
+      configuration: {
+        baseURL: baseUrl || "http://localhost:11434/v1",
+      },
+      timeout,
+    });
   }
-  const { ChatAnthropic } = await import("@langchain/anthropic");
-  return new ChatAnthropic({ model: modelName, temperature: 0, streaming: true });
+
+  if (provider === "anthropic") {
+    const { ChatAnthropic } = await import("@langchain/anthropic");
+    return new ChatAnthropic({
+      model: modelName || "claude-sonnet-4-5-20250929",
+      temperature: 0,
+      streaming: true,
+      anthropicApiKey: apiKey,
+      topP: 0.9,
+      timeout,
+    });
+  }
+
+  // openai or default
+  const { ChatOpenAI } = await import("@langchain/openai");
+  return new ChatOpenAI({
+    model: modelName || "gpt-4o",
+    temperature: 0,
+    streaming: true,
+    openAIApiKey: apiKey,
+    configuration: {
+      baseURL: baseUrl || undefined,
+    },
+    timeout,
+  });
 }
 
 // Extract text content from AI message
@@ -197,6 +229,49 @@ agentRouter.post("/", async (req, res, next) => {
     }
 
     const { message, mode } = parsed.data;
+
+    // Handle onboarding mode separately
+    if (mode === "onboarding") {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const onboardingPrompt = `你是用户的个人资料收集助手。通过友好的对话帮助用户建立个人信息档案。
+
+对话规则：
+- 每次只问一个问题
+- 使用中文对话
+- 问题要自然、友好
+- 如果用户回答不完整，可以适当追问
+- 用户回答后说"好的，记下了"再问下一个
+- 不要透露任何敏感信息
+
+当前用户已经提供了以下信息：
+{collected_info}
+
+请根据用户刚才的回答，继续问下一个问题。`;
+
+      const model = await createModel();
+      const langchainMessages = [
+        new SystemMessage(onboardingPrompt),
+        new HumanMessage(message),
+      ];
+
+      const stream = await model.stream(langchainMessages);
+      let fullResponse = "";
+
+      for await (const chunk of stream) {
+        const chunkText = extractText(chunk as AIMessage);
+        if (chunkText) {
+          fullResponse += chunkText;
+          res.write(`data: ${JSON.stringify({ type: "token", content: chunkText })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ type: "end", thread_id: parsed.data.thread_id || uuidv4() })}\n\n`);
+      res.end();
+      return;
+    }
 
     // Detect mode based on content if auto
     let activeMode: "decision" | "profile" = "profile";

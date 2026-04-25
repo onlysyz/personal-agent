@@ -12,7 +12,8 @@ import {
   Scale,
   Copy,
   Terminal,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord } from '../services/api';
 import { DecisionAnalysis, ProfileData } from '../types';
@@ -29,6 +30,7 @@ export default function DecisionMakerView() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAllDecisions, setShowAllDecisions] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const threadIdRef = useRef<string | null>(null);
@@ -135,7 +137,7 @@ export default function DecisionMakerView() {
             {error}
           </div>
         )}
-        <button onClick={() => setShowHistory(!showHistory)} className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all">
+        <button onClick={() => setShowAllDecisions(true)} className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all">
           <History className="w-4 h-4" /> {t('dashboard.viewAllLogs')}
         </button>
       </header>
@@ -186,7 +188,16 @@ export default function DecisionMakerView() {
                     ? Object.values(d.analysis.alignment as Record<string, number>)[0]
                     : 0;
                 return (
-                  <li key={d.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-surface-container-highest/40 cursor-pointer transition-all border border-transparent hover:border-outline-variant/10 group">
+                  <li
+                    key={d.id}
+                    onClick={() => {
+                      setMessages([
+                        { role: 'user', content: d.question },
+                        { role: 'ai', content: d.analysis }
+                      ]);
+                    }}
+                    className="flex items-start gap-4 p-3 rounded-xl hover:bg-surface-container-highest/40 cursor-pointer transition-all border border-outline-variant/20 hover:border-primary/30 group"
+                  >
                     <CheckCircle2 className="text-secondary w-4 h-4 shrink-0 mt-0.5" />
                     <div>
                       <span className="block text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">{d.question}</span>
@@ -371,6 +382,68 @@ export default function DecisionMakerView() {
           </div>
         </section>
       </div>
+
+      {/* All Decisions Modal */}
+      <AnimatePresence>
+        {showAllDecisions && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAllDecisions(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-surface-container-low rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/30">
+                <h2 className="text-xl font-bold text-on-surface">{t('decisionMaker.recentDecisions')}</h2>
+                <button
+                  onClick={() => setShowAllDecisions(false)}
+                  className="p-2 rounded-full hover:bg-surface-container transition-colors text-on-surface-variant hover:text-on-surface"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[60vh]">
+                {decisions.length === 0 ? (
+                  <p className="text-sm text-on-surface-variant text-center py-8">{t('decisionMaker.noDecisions')}</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {decisions.map((d) => {
+                      const alignmentValue = typeof d.analysis?.alignment === 'number'
+                        ? d.analysis.alignment
+                        : typeof d.analysis?.alignment === 'object' && d.analysis?.alignment !== null
+                          ? Object.values(d.analysis.alignment as Record<string, number>)[0]
+                          : 0;
+                      return (
+                        <li
+                          key={d.id}
+                          onClick={() => {
+                            setMessages([
+                              { role: 'user', content: d.question },
+                              { role: 'ai', content: d.analysis }
+                            ]);
+                            setShowAllDecisions(false);
+                          }}
+                          className="flex items-start gap-4 p-4 rounded-xl hover:bg-surface-container-highest/40 cursor-pointer transition-all border border-outline-variant/20 hover:border-primary/30 group"
+                        >
+                          <CheckCircle2 className="text-secondary w-5 h-5 shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <span className="block text-sm font-semibold text-on-surface group-hover:text-primary transition-colors truncate">{d.question}</span>
+                            <div className="flex items-center gap-4 mt-1.5">
+                              <span className="text-xs text-on-surface-variant">Aligned: {alignmentValue}%</span>
+                              <span className="text-xs text-on-surface-variant/60">{d.created_at}</span>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

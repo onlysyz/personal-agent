@@ -1,0 +1,6 @@
+{
+  "provider": "anthropic",
+  "apiKey": "sk-cp-xzUtVF7-Cq-H8_0gBAgBHSWDk9WXiM8A48m0zFd-q7Fk2IOU6bnCKwAar1lAI6ZIJgwFLTR5M_NF-_4E3sQ-UIRgJmQ_PaUSAD8LnT3_MgwjNAz9V7bBVro",
+  "baseUrl": "https://api.minimaxi.com/anthropic",
+  "model": "MiniMax-M2.7"
+}

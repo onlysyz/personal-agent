@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { getProfile, generateAgentsMd } from "../lib/profile.js";
+import { getServerConfig } from "../lib/config.js";
 import {
   readProfileTool,
   saveDecisionTool,
@@ -34,18 +35,46 @@ function parseLlmModel(modelStr: string): { provider: string; model: string } {
 }
 
 function createModel() {
-  const modelStr = process.env.LLM_MODEL || "anthropic:claude-sonnet-4-5-20250929";
-  const { provider, model } = parseLlmModel(modelStr);
+  const config = getServerConfig();
+  const { provider, model: modelName, apiKey, baseUrl } = config;
+  const timeout = 30000;
 
-  if (provider === "openai") {
-    return new ChatOpenAI({ model, temperature: 0 });
+  if (provider === "ollama") {
+    return new ChatOpenAI({
+      model: modelName || "llama3.2",
+      temperature: 0,
+      openAIApiKey: "ollama",
+      configuration: {
+        baseURL: baseUrl || "http://localhost:11434/v1",
+      },
+      timeout,
+    });
   }
-  return new ChatAnthropic({ model, temperature: 0 });
+
+  if (provider === "anthropic") {
+    return new ChatAnthropic({
+      model: modelName || "claude-sonnet-4-5-20250929",
+      temperature: 0,
+      anthropicApiKey: apiKey,
+      topP: 0.9,
+      timeout,
+    });
+  }
+
+  // openai or default
+  return new ChatOpenAI({
+    model: modelName || "gpt-4o",
+    temperature: 0,
+    openAIApiKey: apiKey,
+    configuration: {
+      baseURL: baseUrl || undefined,
+    },
+    timeout,
+  });
 }
 
 export function createPersonalAgent(_config?: PersonalAgentConfig) {
-  if (agentInstance) return agentInstance;
-
+  // Don't cache agent - always use current config from settings
   const profile = getProfile();
   const profileName = profile?.name || "用户";
 

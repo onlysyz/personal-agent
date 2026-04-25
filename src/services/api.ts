@@ -61,7 +61,7 @@ async function fetchWithRetry<T>(
 }
 
 // Profile API
-export async function fetchProfile(): Promise<ProfileData> {
+export async function fetchProfile(): Promise<ProfileData | null> {
   return fetchWithRetry(`${API_BASE}/profile`);
 }
 
@@ -71,6 +71,52 @@ export async function saveProfile(profile: ProfileData): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(profile),
   });
+}
+
+export async function checkProfileInitialized(): Promise<boolean> {
+  const data = await fetchWithRetry<{ initialized: boolean }>(
+    `${API_BASE}/profile/initialized`
+  );
+  return data.initialized;
+}
+
+export interface ParsedResumeData {
+  name?: string;
+  role?: string;
+  location?: string;
+  email?: string;
+  github?: string;
+  bio?: string;
+  skills?: { name: string; value: number; color?: string }[];
+  experiences?: {
+    company: string;
+    period: string;
+    role: string;
+    description: string;
+    visibility?: string;
+  }[];
+  raw: string;
+}
+
+export async function parseResume(file: File): Promise<ParsedResumeData> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE}/profile/parse-resume`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const json = await response.json().catch(() => ({}));
+    throw new Error(json.error || `Upload failed: ${response.status}`);
+  }
+
+  const json = await response.json();
+  if (json.code !== 0) {
+    throw new Error(json.error || "Parse failed");
+  }
+  return json.data;
 }
 
 // Decisions API
