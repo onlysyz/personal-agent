@@ -7,6 +7,8 @@ import { createPersonalAgent } from "./agent/index.js";
 import profileRouter from "./routes/profile.js";
 import agentRouter from "./routes/agent.js";
 import decisionsRouter from "./routes/decisions.js";
+import settingsRouter from "./routes/settings.js";
+import knowledgeRouter from "./routes/knowledge-base.js";
 
 config();
 
@@ -37,6 +39,8 @@ try {
 app.use("/api/profile", profileRouter);
 app.use("/api/agent", agentRouter);
 app.use("/api/decisions", decisionsRouter);
+app.use("/api/settings", settingsRouter);
+app.use("/api/knowledge", knowledgeRouter);
 
 // Health check
 app.get("/api/health", (_req, res) => {
