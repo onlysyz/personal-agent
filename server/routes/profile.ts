@@ -8,6 +8,14 @@ profileRouter.get("/", (_req, res) => {
   return res.json({ code: 0, data: profile });
 });
 
+profileRouter.get("/public", (_req, res) => {
+  const publicProfile = getPublicProfile();
+  if (!publicProfile) {
+    return res.status(404).json({ code: 404, error: "Profile not found" });
+  }
+  return res.json({ code: 0, data: publicProfile });
+});
+
 profileRouter.put("/", (req, res) => {
   const profile = req.body;
   if (!profile || !profile.name) {

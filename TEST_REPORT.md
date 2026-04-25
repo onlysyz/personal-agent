@@ -178,10 +178,10 @@ data/knowledge/
 **Issue:** API key `sk-test123` was placeholder
 **Resolution:** Valid MiniMax API key configured, full streaming working
 
-### 3. /api/profile/public Not Found
-**Issue:** Endpoint doesn't exist
-**Impact:** Public profile sharing unavailable
-**Note:** Private profile API works correctly
+### 3. /api/profile/public Not Found - RESOLVED
+**Issue:** Endpoint didn't exist
+**Resolution:** Added GET /public route in server/routes/profile.ts using getPublicProfile()
+**Note:** Public profile sharing now available
 
 ---
 
@@ -194,9 +194,7 @@ data/knowledge/
    - Add OpenAI API key and base URL
    - Enables semantic search instead of keyword fallback
 
-3. **Add Public Profile Endpoint:**
-   - Create `/api/profile/public` route
-   - Return sanitized profile data for sharing
+3. **Add Public Profile Endpoint:** ✅ DONE - GET /api/profile/public implemented
 
 4. **Full Agent Testing:**
    - Configure valid API key to test end-to-end agent streaming
