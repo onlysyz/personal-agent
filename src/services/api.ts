@@ -453,3 +453,9 @@ export async function lintKnowledge(): Promise<LintResult> {
     method: "POST",
   });
 }
+
+export async function clearConversation(threadId: string): Promise<void> {
+  await fetchWithRetry(`${API_BASE}/agent/conversation/${threadId}`, {
+    method: "DELETE",
+  });
+}

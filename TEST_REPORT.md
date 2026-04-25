@@ -624,3 +624,18 @@ Multi-turn dialogue works with knowledge base integration:
 | History retrieval | ✅ PASS | GET returns correct messages |
 | Multi-turn continuity | ✅ PASS | Agent references previous messages |
 | Knowledge + history | ✅ PASS | Both features work together |
+| Clear conversation | ✅ PASS | DELETE /conversation/:threadId clears history |
+
+### Clear Button UI
+
+A "Clear" button appears in the DecisionMakerView header when a thread exists:
+- Button only visible when `threadIdRef.current` is set
+- Click calls `clearConversation(threadId)` API
+- Resets `threadIdRef` to null
+- Clears local message state
+
+### Files Modified
+- `server/lib/db.ts` - Added `clearConversation` function
+- `server/routes/agent.ts` - Added DELETE endpoint
+- `src/services/api.ts` - Added `clearConversation` client function
+- `src/views/DecisionMakerView.tsx` - Added Clear button with Trash2 icon

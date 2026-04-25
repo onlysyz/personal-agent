@@ -17,9 +17,10 @@ import {
   Search,
   FileText,
   FileJson,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
-import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord, fetchDocumentContent, DocumentContent, exportDecisionsToJSON, exportDecisionsToMarkdown, downloadFile } from '../services/api';
+import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord, fetchDocumentContent, DocumentContent, exportDecisionsToJSON, exportDecisionsToMarkdown, downloadFile, clearConversation } from '../services/api';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut';
 import { DecisionAnalysis, ProfileData } from '../types';
@@ -244,6 +245,20 @@ export default function DecisionMakerView() {
           <button onClick={() => setShowAllDecisions(true)} className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all">
             <History className="w-4 h-4" /> {t('dashboard.viewAllLogs')}
           </button>
+          {threadIdRef.current && (
+            <button
+              onClick={async () => {
+                if (threadIdRef.current) {
+                  await clearConversation(threadIdRef.current);
+                  threadIdRef.current = null;
+                  setMessages([]);
+                }
+              }}
+              className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all"
+            >
+              <Trash2 className="w-4 h-4" /> Clear
+            </button>
+          )}
         </div>
       </header>
 
