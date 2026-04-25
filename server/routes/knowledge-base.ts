@@ -124,6 +124,7 @@ knowledgeRouter.post("/query", async (req, res) => {
         question,
         answer: result.answer,
         pagesCount: result.pages.length,
+        chunksFound: result.chunksFound,
         citations: result.citations,
       },
     });
