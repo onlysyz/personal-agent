@@ -13,7 +13,8 @@ import {
   Copy,
   Terminal,
   Loader2,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord } from '../services/api';
 import { DecisionAnalysis, ProfileData } from '../types';
@@ -31,6 +32,9 @@ export default function DecisionMakerView() {
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [showAllDecisions, setShowAllDecisions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<DecisionRecord[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const threadIdRef = useRef<string | null>(null);
@@ -120,6 +124,25 @@ export default function DecisionMakerView() {
     }
   };
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const response = await fetch(`/api/decisions/search?keyword=${encodeURIComponent(searchQuery)}`);
+      const json = await response.json();
+      setSearchResults(json.data || []);
+    } catch (err) {
+      console.error("Search failed:", err);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const context = profile ? {
     coreValues: profile.values || [],
     currentGoal: profile.current_goals || "",
@@ -177,11 +200,26 @@ export default function DecisionMakerView() {
             <h2 className="text-lg font-bold text-on-surface mb-6 flex items-center gap-2.5">
               <History className="text-on-surface-variant w-5 h-5" /> {t('decisionMaker.recentDecisions')}
             </h2>
+            <form onSubmit={handleSearch} className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('decisionMaker.searchDecisions') || 'Search decisions...'}
+                  className="w-full pl-10 pr-4 py-2 bg-surface-container-highest border border-outline-variant/30 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary/50"
+                />
+                {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-on-surface-variant" />}
+              </div>
+            </form>
+            {searchResults.length > 0 && (
+              <div className="mb-4 p-3 bg-surface-container-high/50 rounded-xl border border-primary/20">
+                <span className="text-xs text-primary font-medium">{searchResults.length} results for "{searchQuery}"</span>
+              </div>
+            )}
             <ul className="space-y-4">
-              {decisions.length === 0 && (
-                <li className="text-sm text-on-surface-variant">{t('decisionMaker.noDecisions')}</li>
-              )}
-              {decisions.slice(0, 5).map((d) => {
+              {(searchResults.length > 0 ? searchResults : decisions.slice(0, 5)).map((d) => {
                 const alignmentValue = typeof d.analysis?.alignment === 'number'
                   ? d.analysis.alignment
                   : typeof d.analysis?.alignment === 'object' && d.analysis?.alignment !== null
