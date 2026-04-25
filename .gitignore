@@ -15,3 +15,6 @@ data/decisions.db-wal
 
 # Agent memory (regenerated at runtime)
 data/AGENTS.md
+
+# Knowledge base data (generated at runtime)
+data/knowledge/
