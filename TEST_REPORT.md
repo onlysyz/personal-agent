@@ -162,18 +162,16 @@ data/knowledge/
 ├── wiki/              # 4 files (2 wiki pages + index.md + log.md)
 │   ├── index.md       # Regenerated, 2 entries
 │   └── log.md
-└── vector-store.json  # Empty (embeddings disabled)
+└── vector-store.json  # 4 chunks (embeddings populated)
 ```
 
-### Cleanup Results (2026-04-26)
-| Metric | Before | After |
-|--------|--------|-------|
-| Raw documents | 35 | 2 ✅ |
-| Wiki pages | 37 | 4 ✅ |
-| Vector store chunks | 1 | 0 ✅ |
-| index.md entries | 43 | 2 ✅ |
-
-Deleted 33 test documents and their orphaned wiki pages.
+### Final State (2026-04-26)
+| Metric | Value |
+|--------|-------|
+| Raw documents | 2 |
+| Wiki pages | 2 |
+| Embeddings (chunks) | 4 |
+| index.md entries | 2 |
 
 ---
 
