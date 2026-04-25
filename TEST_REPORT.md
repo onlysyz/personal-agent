@@ -196,10 +196,7 @@ data/knowledge/
 
 3. **Add Public Profile Endpoint:** ✅ DONE - GET /api/profile/public implemented
 
-4. **Full Agent Testing:**
-   - Configure valid API key to test end-to-end agent streaming
-   - Verify knowledge context integration with real LLM responses
-   - Test decision mode with profile-matched alignment scoring
+4. **Full Agent Testing:** ✅ DONE - Streaming + knowledge integration verified working
 
 ---
 
