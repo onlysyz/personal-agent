@@ -86,7 +86,7 @@ function getEmbeddings(): OpenAIEmbeddings {
 }
 
 // Generate embeddings for chunks
-export async function generateEmbeddings(chunks: DocumentChunk[], documentId: string, filename: string): Promise<EmbeddedChunk[]> {
+export async function generateEmbeddings(chunks: DocumentChunk[], documentId: string, filename: string, tags: string[] = []): Promise<EmbeddedChunk[]> {
   if (chunks.length === 0) return [];
 
   const embeddings = getEmbeddings();
@@ -102,6 +102,7 @@ export async function generateEmbeddings(chunks: DocumentChunk[], documentId: st
     metadata: {
       ...chunk.metadata,
       filename,
+      tags,
     },
     embedding: embeddingVectors[i],
   }));
@@ -144,6 +145,7 @@ export function semanticSearchScores(
     score: cosineSimilarity(queryEmbedding, chunk.embedding),
     metadata: {
       filename: chunk.metadata.filename,
+      tags: chunk.metadata.tags || [],
     },
   }));
 

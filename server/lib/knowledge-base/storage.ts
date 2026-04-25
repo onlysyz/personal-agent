@@ -42,7 +42,8 @@ function saveMetadata(documents: RawDocument[]) {
 export async function saveRawFile(
   buffer: Buffer,
   filename: string,
-  mimeType: string
+  mimeType: string,
+  tags: string[] = []
 ): Promise<RawDocument> {
   ensureRawDir();
 
@@ -61,6 +62,7 @@ export async function saveRawFile(
     size: buffer.length,
     uploadedAt: new Date().toISOString(),
     rawPath: filePath,
+    tags: tags, // Tags passed during upload
   };
 
   // Update metadata
@@ -107,6 +109,17 @@ export function readRawContent(filePath: string, mimeType: string): string {
   } catch {
     return "";
   }
+}
+
+// Update document tags
+export function updateDocumentTags(id: string, tags: string[]): RawDocument | undefined {
+  const documents = loadMetadata();
+  const doc = documents.find((d) => d.id === id);
+  if (!doc) return undefined;
+
+  doc.tags = tags;
+  saveMetadata(documents);
+  return doc;
 }
 
 // Delete raw document (only removes file, keeps metadata for audit)

@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Search, Bell, Settings, Sun, Moon } from 'lucide-react';
+import { Search, Bell, Settings, Sun, Moon, Keyboard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import SettingsModal from './SettingsModal';
+import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 
 export default function TopBar() {
   const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   return (
     <>
@@ -49,11 +51,20 @@ export default function TopBar() {
             >
               <Settings className="w-5 h-5" />
             </button>
+
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="p-2 rounded-full hover:bg-surface-container transition-colors text-on-surface-variant hover:text-on-surface"
+              title="Keyboard shortcuts (?)"
+            >
+              <Keyboard className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </header>
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <KeyboardShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </>
   );
 }

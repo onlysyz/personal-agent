@@ -30,8 +30,9 @@ title: ${page.title}
 category: ${page.category}
 created: ${page.createdAt}
 updated: ${page.updatedAt}
-sources: ${page.sourceIds.join(", ")}
-links: ${page.linkedPages.join(", ")}
+sources: ${page.sourceIds.length > 0 ? page.sourceIds.join(", ") : "[]"}
+links: ${page.linkedPages.length > 0 ? page.linkedPages.join(", ") : "[]"}
+tags: ${page.tags.length > 0 ? page.tags.join(", ") : "[]"}
 ---
 
 `;
@@ -90,6 +91,7 @@ function parseWikiPageMarkdown(raw: string, filename?: string): WikiPage {
       category: "summary",
       sourceIds: [],
       linkedPages: [],
+      tags: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -100,7 +102,7 @@ function parseWikiPageMarkdown(raw: string, filename?: string): WikiPage {
 
   // Parse frontmatter
   const getMeta = (key: string) => {
-    const match = frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
+    const match = frontmatter.match(new RegExp(`^${key}:\\s*([^\\n]+)$`, "m"));
     return match ? match[1].trim() : "";
   };
 
@@ -109,14 +111,16 @@ function parseWikiPageMarkdown(raw: string, filename?: string): WikiPage {
   const category = getMeta("category") as WikiPage["category"];
   const sourcesStr = getMeta("sources");
   const linksStr = getMeta("links");
+  const tagsStr = getMeta("tags");
 
   return {
     slug,
     title,
     content,
     category: category || "summary",
-    sourceIds: sourcesStr ? sourcesStr.split(", ").filter(Boolean) : [],
-    linkedPages: linksStr ? linksStr.split(", ").filter(Boolean) : [],
+    sourceIds: sourcesStr && sourcesStr !== "[]" ? sourcesStr.split(", ").filter(Boolean) : [],
+    linkedPages: linksStr && linksStr !== "[]" ? linksStr.split(", ").filter(Boolean) : [],
+    tags: tagsStr && tagsStr !== "[]" ? tagsStr.split(", ").filter(Boolean) : [],
     createdAt: getMeta("created") || new Date().toISOString(),
     updatedAt: getMeta("updated") || new Date().toISOString(),
   };
@@ -132,6 +136,7 @@ export function updateWikiIndex(pages: WikiPage[]): void {
       title: p.title,
       summary: extractSummary(p.content),
       category: p.category,
+      tags: p.tags,
       updatedAt: p.updatedAt,
     })),
   };
@@ -149,7 +154,8 @@ export function updateWikiIndex(pages: WikiPage[]): void {
   for (const [category, pages] of byCategory) {
     md += `### ${category.charAt(0).toUpperCase() + category.slice(1)}\n\n`;
     for (const page of pages) {
-      md += `- [${page.title}](./${page.slug}.md) - ${page.summary} (${page.updatedAt})\n`;
+      const tagStr = page.tags.length > 0 ? ` [${page.tags.join(", ")}]` : "";
+      md += `- [${page.title}](./${page.slug}.md) - ${page.summary}${tagStr} (${page.updatedAt})\n`;
     }
     md += "\n";
   }

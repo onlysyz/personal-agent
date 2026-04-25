@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import {
   History,
@@ -14,9 +14,14 @@ import {
   Terminal,
   Loader2,
   X,
-  Search
+  Search,
+  FileText,
+  FileJson,
+  Download
 } from 'lucide-react';
-import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord } from '../services/api';
+import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord, fetchDocumentContent, DocumentContent, exportDecisionsToJSON, exportDecisionsToMarkdown, downloadFile } from '../services/api';
+import DocumentPreviewModal from '../components/DocumentPreviewModal';
+import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut';
 import { DecisionAnalysis, ProfileData } from '../types';
 
 export default function DecisionMakerView() {
@@ -24,7 +29,7 @@ export default function DecisionMakerView() {
   const [query, setQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzingStage, setAnalyzingStage] = useState<string>('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string | DecisionAnalysis; error?: boolean }[]>(() => {
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string | DecisionAnalysis; error?: boolean; sources?: string[]; citations?: string[] }[]>(() => {
     const saved = localStorage.getItem('decisionMakerMessages');
     return saved ? JSON.parse(saved) : [];
   });
@@ -37,7 +42,36 @@ export default function DecisionMakerView() {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Document preview modal state
+  const [previewDoc, setPreviewDoc] = useState<DocumentContent | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Export dropdown state
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const handleExportJSON = () => {
+    const json = exportDecisionsToJSON(decisions);
+    const filename = `decisions-${new Date().toISOString().split('T')[0]}.json`;
+    downloadFile(json, filename, 'application/json');
+    setShowExportMenu(false);
+  };
+
+  const handleExportMarkdown = () => {
+    const md = exportDecisionsToMarkdown(decisions);
+    const filename = `decisions-${new Date().toISOString().split('T')[0]}.md`;
+    downloadFile(md, filename, 'text/markdown');
+    setShowExportMenu(false);
+  };
+
   const threadIdRef = useRef<string | null>(null);
+  const queryInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Ctrl+N to focus new decision input
+  useKeyboardShortcut({
+    key: 'n',
+    ctrlKey: true,
+    action: () => queryInputRef.current?.focus(),
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -81,7 +115,7 @@ export default function DecisionMakerView() {
 
     try {
       setAnalyzingStage(t('decisionMaker.analyzingBackground'));
-      const { reply, threadId: newThreadId } = await chatWithAgent(userQuery, {
+      const { reply, threadId: newThreadId, sources, citations } = await chatWithAgent(userQuery, {
         threadId: threadIdRef.current || undefined,
         mode: 'decision',
       });
@@ -95,12 +129,12 @@ export default function DecisionMakerView() {
         const match = reply.match(/\{[\s\S]*?\}/);
         if (match) {
           const analysis = JSON.parse(match[0]) as DecisionAnalysis;
-          setMessages(prev => [...prev, { role: 'ai', content: analysis }]);
+          setMessages(prev => [...prev, { role: 'ai', content: analysis, sources, citations }]);
         } else {
-          setMessages(prev => [...prev, { role: 'ai', content: reply }]);
+          setMessages(prev => [...prev, { role: 'ai', content: reply, sources, citations }]);
         }
       } catch {
-        setMessages(prev => [...prev, { role: 'ai', content: reply }]);
+        setMessages(prev => [...prev, { role: 'ai', content: reply, sources, citations }]);
       }
     } catch (err) {
       console.error(err);
@@ -121,6 +155,19 @@ export default function DecisionMakerView() {
       const content = lastUserMsg.content;
       setMessages(prev => prev.filter(m => m !== lastUserMsg));
       setQuery(content);
+    }
+  };
+
+  const handleCitationClick = async (citationId: string, filename: string) => {
+    setPreviewLoading(true);
+    setPreviewDoc(null);
+    try {
+      const content = await fetchDocumentContent(citationId);
+      setPreviewDoc(content);
+    } catch (err) {
+      console.error("Failed to load document:", err);
+    } finally {
+      setPreviewLoading(false);
     }
   };
 
@@ -160,9 +207,44 @@ export default function DecisionMakerView() {
             {error}
           </div>
         )}
-        <button onClick={() => setShowAllDecisions(true)} className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all">
-          <History className="w-4 h-4" /> {t('dashboard.viewAllLogs')}
-        </button>
+        <div className="flex items-center gap-3">
+          {decisions.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all"
+              >
+                <Download className="w-4 h-4" /> Export
+              </button>
+              <AnimatePresence>
+                {showExportMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-2 w-48 bg-surface-container-low border border-outline-variant/30 rounded-xl shadow-xl overflow-hidden z-20"
+                  >
+                    <button
+                      onClick={handleExportJSON}
+                      className="w-full px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-container transition-colors flex items-center gap-2"
+                    >
+                      <FileJson className="w-4 h-4" /> Export as JSON
+                    </button>
+                    <button
+                      onClick={handleExportMarkdown}
+                      className="w-full px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-container transition-colors flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4" /> Export as Markdown
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+          <button onClick={() => setShowAllDecisions(true)} className="bg-surface-container border border-outline-variant/30 hover:border-outline-variant/60 text-on-surface text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-all">
+            <History className="w-4 h-4" /> {t('dashboard.viewAllLogs')}
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row gap-8 overflow-hidden">
@@ -282,7 +364,27 @@ export default function DecisionMakerView() {
                           <div className="absolute -left-10 -top-10 w-24 h-24 bg-secondary/5 rounded-full blur-3xl pointer-events-none" />
 
                           {typeof msg.content === 'string' ? (
-                            <p className="text-on-surface leading-relaxed">{msg.content}</p>
+                            <>
+                              <p className="text-on-surface leading-relaxed">{msg.content}</p>
+                              {msg.sources && msg.sources.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-outline-variant/30">
+                                  <p className="text-xs text-on-surface-variant font-medium mb-2">参考来源:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {msg.sources.map((src, i) => (
+                                      <button
+                                        key={i}
+                                        onClick={() => msg.citations?.[i] && handleCitationClick(msg.citations[i], src)}
+                                        className="text-xs px-2 py-1 bg-surface-container rounded-md text-on-surface-variant hover:bg-secondary-container hover:text-secondary transition-colors cursor-pointer flex items-center gap-1"
+                                        title="点击预览文档"
+                                      >
+                                        <FileText size={12} />
+                                        {src}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           ) : (
                             <div className="space-y-6">
                               <p className="text-[15px] text-on-surface leading-relaxed opacity-90">
@@ -397,8 +499,9 @@ export default function DecisionMakerView() {
           <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low shrink-0">
             <div className="max-w-[800px] mx-auto relative flex items-center">
               <textarea
+                ref={queryInputRef}
                 className="w-full bg-surface-container border border-outline-variant/30 rounded-2xl py-4 pl-5 pr-14 text-on-surface text-[15px] focus:ring-2 focus:ring-primary/20 focus:border-primary/50 resize-none placeholder-on-surface-variant/40 min-h-[56px] transition-all"
-                placeholder={t('decisionMaker.askFollowUp')}
+                placeholder={`${t('decisionMaker.askFollowUp')} (Ctrl+N)`}
                 rows={1}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -482,6 +585,13 @@ export default function DecisionMakerView() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        document={previewDoc}
+        isLoading={previewLoading}
+        onClose={() => setPreviewDoc(null)}
+      />
     </div>
   );
 }

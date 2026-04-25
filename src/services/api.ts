@@ -140,12 +140,65 @@ export async function fetchDecisionById(id: string): Promise<DecisionRecord> {
   return fetchWithRetry(`${API_BASE}/decisions/${id}`);
 }
 
+// Decision Export Functions
+export function exportDecisionsToJSON(decisions: DecisionRecord[]): string {
+  return JSON.stringify(decisions, null, 2);
+}
+
+export function exportDecisionsToMarkdown(decisions: DecisionRecord[]): string {
+  const header = `# Decision History
+
+Exported on ${new Date().toLocaleDateString()}
+
+Total decisions: ${decisions.length}
+
+---
+
+`;
+
+  const decisionLines = decisions.map((d, i) => {
+    const date = new Date(d.created_at).toLocaleString();
+    return `## ${i + 1}. ${d.question}
+
+**Date:** ${date}
+**Alignment Score:** ${d.analysis.alignment}/100
+
+### Summary
+${d.analysis.summary}
+
+### Pros
+${d.analysis.pros.map(p => `- ${p}`).join('\n')}
+
+### Cons
+${d.analysis.cons.map(c => `- ${c}`).join('\n')}
+
+---
+`;
+  }).join('\n');
+
+  return header + decisionLines;
+}
+
+export function downloadFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // Agent Chat API (SSE streaming)
 export interface AgentStreamEvent {
-  type: "token" | "end" | "error";
+  type: "token" | "end" | "error" | "sources";
   content?: string;
   thread_id?: string;
   error?: string;
+  sources?: string[];
+  citations?: string[];  // Document IDs corresponding to sources
 }
 
 export interface StreamOptions {
@@ -228,10 +281,12 @@ export function streamAgentChat(
 export async function chatWithAgent(
   message: string,
   options: StreamOptions = {}
-): Promise<{ reply: string; threadId: string }> {
+): Promise<{ reply: string; threadId: string; sources?: string[]; citations?: string[] }> {
   const { stream, threadId } = streamAgentChat(message, options);
   const reader = stream.getReader();
   let reply = "";
+  let sources: string[] | undefined;
+  let citations: string[] | undefined;
 
   try {
     while (true) {
@@ -240,12 +295,16 @@ export async function chatWithAgent(
       if (value.type === "token" && value.content) {
         reply += value.content;
       }
+      if (value.type === "sources" && value.sources) {
+        sources = value.sources;
+        citations = value.citations;
+      }
     }
   } finally {
     reader.releaseLock();
   }
 
-  return { reply, threadId };
+  return { reply, threadId, sources, citations };
 }
 
 // Knowledge Base API - LLM Wiki Pattern
@@ -255,26 +314,80 @@ export interface KnowledgeDocument {
   mimeType: string;
   size: number;
   uploadedAt: string;
+  tags?: string[];
 }
 
 export interface KnowledgeStatus {
   rawDocuments: number;
   wikiPages: number;
-  chunks: number;
   categories: string[];
+  tags: string[];
 }
 
 export async function fetchKnowledgeStatus(): Promise<KnowledgeStatus> {
   return fetchWithRetry(`${API_BASE}/knowledge`);
 }
 
+export interface TagInfo {
+  name: string;
+  inUse: boolean;
+  documentCount: number;
+}
+
+export async function fetchKnowledgeTags(): Promise<TagInfo[]> {
+  return fetchWithRetry(`${API_BASE}/knowledge/tags`);
+}
+
+export async function deleteTag(tag: string): Promise<{ removedFrom: number }> {
+  const response = await fetch(`${API_BASE}/knowledge/tags/${encodeURIComponent(tag)}`, {
+    method: "DELETE",
+  });
+  const json = await response.json();
+  if (json.code !== 0) {
+    throw new Error(json.error || "Failed to delete tag");
+  }
+  return json.data;
+}
+
+export async function renameTag(oldTag: string, newTag: string): Promise<{ renamed: number }> {
+  const response = await fetch(`${API_BASE}/knowledge/tags/${encodeURIComponent(oldTag)}/rename`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ newTag }),
+  });
+  const json = await response.json();
+  if (json.code !== 0) {
+    throw new Error(json.error || "Failed to rename tag");
+  }
+  return json.data;
+}
+
 export async function fetchKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
   return fetchWithRetry(`${API_BASE}/knowledge/raw`);
 }
 
-export async function uploadDocument(file: File): Promise<{ success: boolean; filename: string; wikiPagesCreated: number; chunksCreated: number; message: string }> {
+export interface DocumentContent {
+  id: string;
+  filename: string;
+  mimeType: string;
+  content: string;
+}
+
+export async function fetchDocumentContent(id: string): Promise<DocumentContent> {
+  const response = await fetch(`${API_BASE}/knowledge/raw/${id}/content`);
+  const json = await response.json();
+  if (json.code !== 0) {
+    throw new Error(json.error || "Failed to fetch document content");
+  }
+  return json.data;
+}
+
+export async function uploadDocument(file: File, tags: string[] = []): Promise<{ success: boolean; filename: string; tags: string[]; wikiPagesCreated: number; message: string }> {
   const formData = new FormData();
   formData.append("file", file);
+  if (tags.length > 0) {
+    formData.append("tags", JSON.stringify(tags));
+  }
 
   const response = await fetch(`${API_BASE}/knowledge/ingest`, {
     method: "POST",
@@ -297,6 +410,27 @@ export async function deleteDocument(id: string): Promise<void> {
   await fetchWithRetry(`${API_BASE}/knowledge/raw/${id}`, {
     method: "DELETE",
   });
+}
+
+export async function updateDocumentTags(id: string, tags: string[]): Promise<void> {
+  await fetchWithRetry(`${API_BASE}/knowledge/tags/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tags }),
+  });
+}
+
+export async function batchUpdateDocumentTags(ids: string[], tags: string[]): Promise<{ updated: number; failed: string[] }> {
+  const response = await fetch(`${API_BASE}/knowledge/tags/batch`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids, tags }),
+  });
+  const json = await response.json();
+  if (json.code !== 0) {
+    throw new Error(json.error || "Batch update failed");
+  }
+  return json.data;
 }
 
 export async function queryKnowledge(question: string): Promise<{ answer: string; pagesCount: number; citations: string[] }> {

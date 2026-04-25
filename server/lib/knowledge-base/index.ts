@@ -1,11 +1,9 @@
 // Knowledge Base - LLM Wiki Pattern Implementation
-// Main entry point for the 3-layer wiki system
+// Main entry point for the simplified wiki system (no embeddings)
 
 export * from "./types.js";
 export * from "./storage.js";
 export * from "./wiki.js";
-export * from "./embeddings.js";
-export * from "./vector-store.js";
 
 import {
   saveRawFile,
@@ -14,40 +12,22 @@ import {
   getRawDocumentPath,
   readRawContent,
   deleteRawDocument,
+  updateDocumentTags,
 } from "./storage.js";
 
 import {
   saveWikiPage,
   getWikiPage,
   getAllWikiPages,
+  deleteWikiPage,
   updateWikiIndex,
   appendToLog,
   generateSchema,
 } from "./wiki.js";
 
 import {
-  chunkText,
-  generateEmbeddings,
-  generateQueryEmbedding,
-  semanticSearchScores,
-} from "./embeddings.js";
-
-import {
-  addToVectorStore,
-  removeFromVectorStore,
-  getAllChunks,
-  getChunksByDocumentId,
-  searchChunks,
-} from "./vector-store.js";
-
-import {
-  getServerConfig,
-} from "../config.js";
-
-import {
   RawDocument,
   WikiPage,
-  EmbeddedChunk,
 } from "./types.js";
 
 // --- Ingest Operation ---
@@ -55,21 +35,20 @@ import {
 export interface IngestResult {
   rawDocument: RawDocument;
   wikiPages: WikiPage[];
-  chunksCreated: number;
 }
 
 // Ingest a new document into the wiki
 export async function ingestDocument(
   fileBuffer: Buffer,
   filename: string,
-  mimeType: string
+  mimeType: string,
+  tags: string[] = []
 ): Promise<IngestResult> {
-  const config = getServerConfig();
   console.log(`[INGEST] Starting ingestion for: ${filename} (${mimeType})`);
 
   // Step 1: Save raw file
-  const rawDocument = await saveRawFile(fileBuffer, filename, mimeType);
-  console.log(`[INGEST] Step 1 - Raw file saved: ${rawDocument.id}`);
+  const rawDocument = await saveRawFile(fileBuffer, filename, mimeType, tags);
+  console.log(`[INGEST] Step 1 - Raw file saved: ${rawDocument.id} with tags: ${tags.join(", ")}`);
 
   // Step 2: Read raw content
   const filePath = getRawDocumentPath(rawDocument.id);
@@ -81,54 +60,30 @@ export async function ingestDocument(
   const rawContent = readRawContent(filePath, mimeType);
   console.log(`[INGEST] Step 2 - Content length: ${rawContent.length} chars`);
 
-  // Step 3: Chunk the content
-  const chunks = chunkText(rawContent);
-  console.log(`[INGEST] Step 3 - Created ${chunks.length} chunks`);
-
-  // Step 4: Generate embeddings for chunks (skip if API fails)
-  let embeddedChunks: EmbeddedChunk[] = [];
-  const embeddingConfig = config.embedding || {};
-  // Only attempt embeddings if embedding API is explicitly configured
-  const hasEmbeddingConfig = embeddingConfig.apiKey && embeddingConfig.baseUrl;
-
-  if (hasEmbeddingConfig && chunks.length > 0) {
-    console.log(`[INGEST] Step 4 - About to generate embeddings, chunk count: ${chunks.length}`);
-    try {
-      embeddedChunks = await generateEmbeddings(chunks, rawDocument.id, filename);
-      addToVectorStore(embeddedChunks);
-      console.log(`[INGEST] Step 4 - Generated ${embeddedChunks.length} embeddings`);
-    } catch (err) {
-      console.warn("[INGEST] Step 4 - Embedding generation failed:", err);
-    }
-  } else {
-    console.log(`[INGEST] Step 4 - Skipping embeddings (no separate embedding config)`);
-  }
-
-  // Step 5: Generate wiki pages
-  console.log(`[INGEST] Step 5 - Generating wiki pages...`);
+  // Step 3: Generate wiki pages
+  console.log(`[INGEST] Step 3 - Generating wiki pages...`);
   const wikiPages = await generateWikiPages(rawDocument, rawContent);
-  console.log(`[INGEST] Step 5 - Generated ${wikiPages.length} wiki pages`);
+  console.log(`[INGEST] Step 3 - Generated ${wikiPages.length} wiki pages`);
 
-  // Step 6: Save wiki pages
+  // Step 4: Save wiki pages
   for (const page of wikiPages) {
-    console.log(`[INGEST] Step 6 - Saving wiki page: ${page.slug}`);
+    console.log(`[INGEST] Step 4 - Saving wiki page: ${page.slug}`);
     saveWikiPage(page);
   }
 
-  // Step 7: Update index
+  // Step 5: Update index
   const allPages = getAllWikiPages();
-  console.log(`[INGEST] Step 7 - Total wiki pages after ingest: ${allPages.length}`);
+  console.log(`[INGEST] Step 5 - Total wiki pages after ingest: ${allPages.length}`);
   updateWikiIndex(allPages);
 
-  // Step 8: Log operation
-  appendToLog("ingest", `Added ${filename}`, `Created ${wikiPages.length} wiki pages and ${embeddedChunks.length} chunks`);
+  // Step 6: Log operation
+  appendToLog("ingest", `Added ${filename}`, `Created ${wikiPages.length} wiki pages`);
 
-  return { rawDocument, wikiPages, chunksCreated: embeddedChunks.length };
+  return { rawDocument, wikiPages };
 }
 
 // Generate wiki pages from raw document using LLM
 async function generateWikiPages(rawDoc: RawDocument, rawContent: string): Promise<WikiPage[]> {
-  const config = getServerConfig();
   const pages: WikiPage[] = [];
   const now = new Date().toISOString();
 
@@ -147,6 +102,7 @@ async function generateWikiPages(rawDoc: RawDocument, rawContent: string): Promi
       category: "summary",
       sourceIds: [rawDoc.id],
       linkedPages: [],
+      tags: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -167,6 +123,7 @@ async function generateWikiPages(rawDoc: RawDocument, rawContent: string): Promi
       category: "entity",
       sourceIds: [rawDoc.id],
       linkedPages: [],
+      tags: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -199,86 +156,72 @@ export interface QueryResult {
   answer: string;
   pages: WikiPage[];
   citations: string[];
+  sources: string[];  // Human-readable source filenames
   chunksFound: number;
+  filteredByTag?: string;
 }
 
-// Query the wiki for answers using semantic search
-export async function queryWiki(question: string): Promise<QueryResult> {
+// Query the wiki for answers using wiki pages + keyword matching
+// Note: Embeddings/semantic search is disabled - using LLM-based relevance via findRelevantPages
+export async function queryWiki(question: string, tagFilter?: string): Promise<QueryResult> {
   try {
-    // Get all chunks
-    const allChunks = getAllChunks();
+    const allPages = getAllWikiPages();
 
-    // If no chunks, fall back to wiki pages
-    if (allChunks.length === 0) {
-      const allPages = getAllWikiPages();
-      if (allPages.length === 0) {
-        appendToLog("query", question, "No documents in knowledge base");
-        return {
-          answer: "The knowledge base is empty. Upload some documents first.",
-          pages: [],
-          citations: [],
-          chunksFound: 0,
-        };
-      }
-      // Keyword search in wiki pages as fallback
-      const relevantPages = findRelevantPages(question, allPages);
-      const answer = await generateAnswer(question, relevantPages);
-      appendToLog("query", question, `Found ${relevantPages.length} pages (no embeddings)`);
+    if (allPages.length === 0) {
+      appendToLog("query", question, "No documents in knowledge base");
       return {
-        answer,
-        pages: relevantPages,
-        citations: relevantPages.map((p) => p.slug),
+        answer: "The knowledge base is empty. Upload some documents first.",
+        pages: [],
+        citations: [],
+        sources: [],
         chunksFound: 0,
+        filteredByTag: tagFilter,
       };
     }
 
-    // Generate embedding for the query
-    let queryEmbedding: number[];
-    try {
-      queryEmbedding = await generateQueryEmbedding(question);
-    } catch {
-      // Fall back to wiki pages if embedding fails
-      const allPages = getAllWikiPages();
-      const relevantPages = findRelevantPages(question, allPages);
-      const answer = await generateAnswer(question, relevantPages);
-      appendToLog("query", question, `Found ${relevantPages.length} pages (embedding failed)`);
+    // Apply tag filter to pages if provided
+    const filteredPages = tagFilter
+      ? allPages.filter(p => (p.tags || []).includes(tagFilter))
+      : allPages;
+
+    if (filteredPages.length === 0) {
+      appendToLog("query", question, `No pages match tag filter: ${tagFilter}`);
       return {
-        answer,
-        pages: relevantPages,
-        citations: relevantPages.map((p) => p.slug),
+        answer: `No documents found with tag "${tagFilter}".`,
+        pages: [],
+        citations: [],
+        sources: [],
         chunksFound: 0,
+        filteredByTag: tagFilter,
       };
     }
 
-    // Perform semantic search
-    const searchResults = semanticSearchScores(queryEmbedding, allChunks, 5);
+    // Find relevant pages using keyword matching
+    const relevantPages = findRelevantPages(question, filteredPages);
 
-    if (searchResults.length === 0) {
-      appendToLog("query", question, "No relevant chunks found");
+    if (relevantPages.length === 0) {
+      appendToLog("query", question, "No relevant pages found");
       return {
         answer: "I couldn't find relevant information in the knowledge base.",
         pages: [],
         citations: [],
+        sources: [],
         chunksFound: 0,
+        filteredByTag: tagFilter,
       };
     }
 
-    // Build answer from search results
-    const context = searchResults
-      .map((r) => `[${r.metadata.filename}]\n${r.content}`)
-      .join("\n\n---\n\n");
-
-    // Get unique document IDs for citation
-    const uniqueDocIds = [...new Set(searchResults.map((r) => r.documentId))];
-
-    // Log query
-    appendToLog("query", question, `Found ${searchResults.length} relevant chunks from ${uniqueDocIds.length} documents`);
+    // Generate answer from relevant wiki pages
+    const answer = await generateAnswer(question, relevantPages);
+    appendToLog("query", question, `Found ${relevantPages.length} relevant pages`);
 
     return {
-      answer: `Based on the knowledge base:\n\n${context}\n\n---\n\nFound ${searchResults.length} relevant passage(s).`,
-      pages: [],
-      citations: uniqueDocIds,
-      chunksFound: searchResults.length,
+      answer,
+      pages: relevantPages,
+      citations: relevantPages.map((p) => p.slug),
+      sources: relevantPages.map((p) => p.title),
+      chunksFound: 0,
+      filteredByTag: tagFilter,
     };
   } catch (err) {
     console.error("Query failed:", err);
@@ -286,14 +229,16 @@ export async function queryWiki(question: string): Promise<QueryResult> {
       answer: "Failed to query knowledge base.",
       pages: [],
       citations: [],
+      sources: [],
       chunksFound: 0,
     };
   }
 }
 
-// Find pages relevant to the question (simple keyword matching fallback)
+// Find pages relevant to the question using keyword matching
 function findRelevantPages(question: string, pages: WikiPage[]): WikiPage[] {
-  const keywords = question.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  // Use shorter keyword threshold (2 chars) to catch more matches
+  const keywords = question.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
   const scored = pages.map((page) => {
     let score = 0;
     const searchText = `${page.title} ${page.content}`.toLowerCase();
@@ -302,12 +247,18 @@ function findRelevantPages(question: string, pages: WikiPage[]): WikiPage[] {
         score++;
       }
     }
+    // Bonus: title match counts extra
+    for (const keyword of keywords) {
+      if (page.title.toLowerCase().includes(keyword)) {
+        score += 2;
+      }
+    }
     return { page, score };
   });
 
-  // Sort by score and return top matches
+  // Sort by score and return top matches (up to 10 for broader coverage)
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, 5).map((s) => s.page);
+  return scored.slice(0, 10).map((s) => s.page);
 }
 
 // Generate answer using LLM with context from wiki pages
@@ -389,8 +340,16 @@ export function getDocument(documentId: string) {
 }
 
 export function removeDocument(documentId: string): boolean {
-  // Remove from vector store
-  removeFromVectorStore(documentId);
+  // Get document info to find wiki page slug
+  const doc = getRawDocumentById(documentId);
+  if (doc) {
+    // Construct wiki page slug: slugify(filename without ext) + id prefix
+    const filenameWithoutExt = doc.filename.replace(/\.[^.]+$/, "");
+    const idPrefix = documentId.split("-")[0];
+    const wikiSlug = `${slugify(filenameWithoutExt)}-${idPrefix}`;
+    deleteWikiPage(wikiSlug);
+  }
+
   // Delete raw file
   return deleteRawDocument(documentId);
 }
@@ -398,11 +357,88 @@ export function removeDocument(documentId: string): boolean {
 export function getWikiStatus() {
   const pages = getAllWikiPages();
   const docs = getAllRawDocuments();
-  const chunks = getAllChunks();
   return {
     rawDocuments: docs.length,
     wikiPages: pages.length,
-    chunks: chunks.length,
     categories: [...new Set(pages.map((p) => p.category))],
   };
+}
+
+// Get tags for a specific document
+export function getDocumentTags(documentId: string): string[] {
+  const doc = getRawDocumentById(documentId);
+  return doc?.tags || [];
+}
+
+// Update tags for a document
+export function updateTags(documentId: string, tags: string[]): boolean {
+  const updated = updateDocumentTags(documentId, tags);
+  return !!updated;
+}
+
+// Batch update tags for multiple documents
+export function batchUpdateTags(documentIds: string[], tags: string[]): { updated: number; failed: string[] } {
+  const failed: string[] = [];
+  let updated = 0;
+
+  for (const id of documentIds) {
+    const result = updateDocumentTags(id, tags);
+    if (result) {
+      updated++;
+    } else {
+      failed.push(id);
+    }
+  }
+
+  return { updated, failed };
+}
+
+// Remove a tag from all documents
+export function removeTagFromAllDocuments(tagToRemove: string): number {
+  const docs = getAllRawDocuments();
+  let removedCount = 0;
+
+  for (const doc of docs) {
+    if (doc.tags && doc.tags.includes(tagToRemove)) {
+      const newTags = doc.tags.filter((t) => t !== tagToRemove);
+      const result = updateDocumentTags(doc.id, newTags);
+      if (result) removedCount++;
+    }
+  }
+
+  return removedCount;
+}
+
+// Rename a tag across all documents
+export function renameTag(oldTag: string, newTag: string): number {
+  const docs = getAllRawDocuments();
+  let renamedCount = 0;
+
+  for (const doc of docs) {
+    if (doc.tags && doc.tags.includes(oldTag)) {
+      const newTags = doc.tags.map((t) => (t === oldTag ? newTag : t));
+      const result = updateDocumentTags(doc.id, newTags);
+      if (result) renamedCount++;
+    }
+  }
+
+  return renamedCount;
+}
+
+// Get all unique tags across all documents
+export function getAllTags(): string[] {
+  const docs = getAllRawDocuments();
+  const tagSet = new Set<string>();
+  for (const doc of docs) {
+    for (const tag of doc.tags || []) {
+      tagSet.add(tag);
+    }
+  }
+  return Array.from(tagSet).sort();
+}
+
+// Get documents filtered by tag
+export function getDocumentsByTag(tag: string): RawDocument[] {
+  const docs = getAllRawDocuments();
+  return docs.filter((doc) => (doc.tags || []).includes(tag));
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { X, Loader2, CheckCircle, Globe, Key, Cpu, AlertCircle, Plug } from "lucide-react";
+import { X, Loader2, CheckCircle, Globe, Key, Cpu, AlertCircle, Plug, Tag, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { fetchKnowledgeTags, deleteTag, renameTag, TagInfo } from "../services/api";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -30,6 +31,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Tag management state
+  const [tags, setTags] = useState<TagInfo[]>([]);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [editingTag, setEditingTag] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [isManagingTags, setIsManagingTags] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       fetchSettings();
@@ -48,8 +56,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setError(null);
     setTestStatus(null);
     try {
-      const res = await fetch("/api/settings");
-      const data = await res.json();
+      const [settingsRes, tagsRes] = await Promise.all([
+        fetch("/api/settings"),
+        fetchKnowledgeTags(),
+      ]);
+      const data = await settingsRes.json();
       if (data.code === 0) {
         setApiKey(data.data.apiKey || "");
         setBaseUrl(data.data.baseUrl || "");
@@ -65,6 +76,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           setEmbeddingModel("text-embedding-3-small");
         }
       }
+      setTags(tagsRes);
     } catch (err) {
       setError("Failed to load settings");
     } finally {
@@ -105,6 +117,40 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setTestMessage("Connection failed");
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleDeleteTag = async (tagName: string) => {
+    if (!confirm(`Delete tag "${tagName}" from all documents?`)) return;
+    setIsManagingTags(true);
+    try {
+      await deleteTag(tagName);
+      setTags(tags.filter((t) => t.name !== tagName));
+    } catch (err) {
+      setError(`Failed to delete tag: ${err}`);
+    } finally {
+      setIsManagingTags(false);
+    }
+  };
+
+  const handleRenameTag = async (oldTagName: string) => {
+    if (!editingValue.trim() || editingValue === oldTagName) {
+      setEditingTag(null);
+      return;
+    }
+    if (!confirm(`Rename tag "${oldTagName}" to "${editingValue.trim()}"? This will update all documents with this tag.`)) {
+      setEditingTag(null);
+      return;
+    }
+    setIsManagingTags(true);
+    try {
+      await renameTag(oldTagName, editingValue.trim());
+      setTags(tags.map((t) => (t.name === oldTagName ? { ...t, name: editingValue.trim() } : t)));
+      setEditingTag(null);
+    } catch (err) {
+      setError(`Failed to rename tag: ${err}`);
+    } finally {
+      setIsManagingTags(false);
     }
   };
 
@@ -292,6 +338,90 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   />
                 </div>
+              </div>
+
+              {/* Tag Management Section */}
+              <div className="border-t border-outline-variant/30 pt-5 mt-2">
+                <button
+                  onClick={() => setTagsExpanded(!tagsExpanded)}
+                  className="w-full flex items-center justify-between text-sm font-semibold text-on-surface mb-3"
+                >
+                  <span className="flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-on-surface-variant" />
+                    Tag Management ({tags.length} tags)
+                  </span>
+                  {tagsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {tagsExpanded && (
+                  <div className="space-y-2">
+                    {tags.length === 0 ? (
+                      <p className="text-xs text-on-surface-variant py-2">No tags yet. Upload documents with tags to see them here.</p>
+                    ) : (
+                      <ul className="space-y-1 max-h-48 overflow-y-auto">
+                        {tags.map((tag) => (
+                          <li key={tag.name} className="flex items-center gap-2 p-2 bg-surface-container rounded-lg">
+                            {editingTag === tag.name ? (
+                              <>
+                                <input
+                                  type="text"
+                                  value={editingValue}
+                                  onChange={(e) => setEditingValue(e.target.value)}
+                                  onKeyDown={(e) => e.key === "Enter" && handleRenameTag(tag.name)}
+                                  className="flex-1 bg-surface border border-outline-variant/30 rounded px-2 py-1 text-sm text-on-surface"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleRenameTag(tag.name)}
+                                  disabled={isManagingTags}
+                                  className="p-1.5 text-secondary hover:bg-secondary-container rounded"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setEditingTag(null)}
+                                  className="p-1.5 text-on-surface-variant hover:bg-surface-container-high rounded"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="flex-1 text-sm text-on-surface truncate">
+                                  {tag.name}
+                                  {tag.inUse && (
+                                    <span className="ml-2 text-xs text-on-surface-variant/50">({tag.documentCount} docs)</span>
+                                  )}
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    setEditingTag(tag.name);
+                                    setEditingValue(tag.name);
+                                  }}
+                                  className="p-1.5 text-on-surface-variant hover:bg-surface-container-high rounded"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTag(tag.name)}
+                                  disabled={isManagingTags || tag.inUse}
+                                  title={tag.inUse ? "Cannot delete tag that is in use by documents" : "Delete tag"}
+                                  className={`p-1.5 rounded ${
+                                    tag.inUse
+                                      ? "text-on-surface-variant/30 cursor-not-allowed"
+                                      : "text-error/70 hover:bg-error-container"
+                                  }`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Test Button */}

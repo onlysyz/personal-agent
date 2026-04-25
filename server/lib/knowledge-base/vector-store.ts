@@ -95,6 +95,7 @@ export function searchChunks(queryEmbedding: number[], chunks: EmbeddedChunk[], 
     score: cosineSimilarity(queryEmbedding, chunk.embedding),
     metadata: {
       filename: chunk.metadata.filename,
+      tags: chunk.metadata.tags || [],
     },
   }));
 

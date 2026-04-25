@@ -5,6 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/ToastContext';
 import DashboardView from './views/DashboardView';
 import DecisionMakerView from './views/DecisionMakerView';
+import KnowledgeBaseView from './views/KnowledgeBaseView';
 import PublicProfileView from './views/PublicProfileView';
 import DataEditorView from './views/DataEditorView';
 
@@ -17,6 +18,7 @@ export default function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<DashboardView />} />
               <Route path="decision-maker" element={<DecisionMakerView />} />
+              <Route path="knowledge-base" element={<KnowledgeBaseView />} />
               <Route path="public-profile" element={<PublicProfileView />} />
               <Route path="data-editor" element={<DataEditorView />} />
             </Route>

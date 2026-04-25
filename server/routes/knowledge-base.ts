@@ -9,6 +9,15 @@ import {
   getDocument,
   removeDocument,
   getWikiStatus,
+  updateTags,
+  batchUpdateTags,
+  getAllTags,
+  getDocumentsByTag,
+  removeTagFromAllDocuments,
+  renameTag,
+  getRawDocumentPath,
+  readRawContent,
+  getAllRawDocuments,
 } from "../lib/knowledge-base/index.js";
 
 const knowledgeRouter = Router();
@@ -37,7 +46,8 @@ const upload = multer({
 knowledgeRouter.get("/", (_req, res) => {
   try {
     const status = getWikiStatus();
-    return res.json({ code: 0, data: status });
+    const tags = getAllTags();
+    return res.json({ code: 0, data: { ...status, tags } });
   } catch (err) {
     console.error("Failed to get status:", err);
     return res.status(500).json({ code: 500, error: "Failed to get status" });
@@ -72,6 +82,67 @@ knowledgeRouter.get("/raw/:id", (req, res) => {
   }
 });
 
+// GET /api/knowledge/raw/:id/content - Get raw document content
+knowledgeRouter.get("/raw/:id/content", (req, res) => {
+  try {
+    const document = getDocument(req.params.id);
+    if (!document) {
+      return res.status(404).json({ code: 404, error: "Document not found" });
+    }
+
+    const filePath = getRawDocumentPath(req.params.id);
+    if (!filePath) {
+      return res.status(404).json({ code: 404, error: "File not found on disk" });
+    }
+
+    const content = readRawContent(filePath, document.mimeType);
+    return res.json({
+      code: 0,
+      data: {
+        id: document.id,
+        filename: document.filename,
+        mimeType: document.mimeType,
+        content,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to get document content:", err);
+    return res.status(500).json({ code: 500, error: "Failed to get document content" });
+  }
+});
+
+// GET /api/knowledge/raw/by-filename/:filename - Get raw document by filename
+knowledgeRouter.get("/raw/by-filename/:filename", (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const docs = getAllRawDocuments();
+    const document = docs.find((d) => d.filename === filename);
+
+    if (!document) {
+      return res.status(404).json({ code: 404, error: "Document not found" });
+    }
+
+    const filePath = getRawDocumentPath(document.id);
+    if (!filePath) {
+      return res.status(404).json({ code: 404, error: "File not found on disk" });
+    }
+
+    const content = readRawContent(filePath, document.mimeType);
+    return res.json({
+      code: 0,
+      data: {
+        id: document.id,
+        filename: document.filename,
+        mimeType: document.mimeType,
+        content,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to get document by filename:", err);
+    return res.status(500).json({ code: 500, error: "Failed to get document by filename" });
+  }
+});
+
 // POST /api/knowledge/ingest - Upload and ingest a document
 knowledgeRouter.post("/ingest", upload.single("file"), async (req, res) => {
   try {
@@ -79,10 +150,16 @@ knowledgeRouter.post("/ingest", upload.single("file"), async (req, res) => {
       return res.status(400).json({ code: 400, error: "No file uploaded" });
     }
 
+    // Get tags from request body (optional)
+    const tags = typeof req.body.tags === 'string'
+      ? JSON.parse(req.body.tags)
+      : Array.isArray(req.body.tags) ? req.body.tags : [];
+
     const result = await ingestDocument(
       req.file.buffer,
       req.file.originalname,
-      req.file.mimetype
+      req.file.mimetype,
+      tags
     );
 
     return res.json({
@@ -91,11 +168,9 @@ knowledgeRouter.post("/ingest", upload.single("file"), async (req, res) => {
         success: true,
         rawDocumentId: result.rawDocument.id,
         filename: result.rawDocument.filename,
+        tags: result.rawDocument.tags,
         wikiPagesCreated: result.wikiPages.length,
-        chunksCreated: result.chunksCreated,
-        message: result.chunksCreated > 0
-          ? `Document processed. Created ${result.wikiPages.length} wiki page(s) with ${result.chunksCreated} embeddings.`
-          : `Document ingested. Created ${result.wikiPages.length} wiki page(s).`,
+        message: `Document ingested. Created ${result.wikiPages.length} wiki page(s).`,
       },
     });
   } catch (err) {
@@ -107,16 +182,144 @@ knowledgeRouter.post("/ingest", upload.single("file"), async (req, res) => {
   }
 });
 
+// PUT /api/knowledge/tags/:id - Update tags for a document
+knowledgeRouter.put("/tags/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body;
+
+    if (!Array.isArray(tags)) {
+      return res.status(400).json({ code: 400, error: "Tags must be an array" });
+    }
+
+    const success = updateTags(id, tags);
+    if (!success) {
+      return res.status(404).json({ code: 404, error: "Document not found" });
+    }
+
+    return res.json({
+      code: 0,
+      data: { success: true, id, tags },
+    });
+  } catch (err) {
+    console.error("Failed to update tags:", err);
+    return res.status(500).json({ code: 500, error: "Failed to update tags" });
+  }
+});
+
+// PATCH /api/knowledge/tags/batch - Batch update tags for multiple documents
+knowledgeRouter.patch("/tags/batch", (req, res) => {
+  try {
+    const { ids, tags } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ code: 400, error: "ids must be a non-empty array" });
+    }
+
+    if (!Array.isArray(tags)) {
+      return res.status(400).json({ code: 400, error: "tags must be an array" });
+    }
+
+    const result = batchUpdateTags(ids, tags);
+
+    return res.json({
+      code: 0,
+      data: {
+        success: true,
+        updated: result.updated,
+        failed: result.failed,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to batch update tags:", err);
+    return res.status(500).json({ code: 500, error: "Failed to batch update tags" });
+  }
+});
+
+// GET /api/knowledge/tags - Get all unique tags with usage info
+knowledgeRouter.get("/tags", (_req, res) => {
+  try {
+    const tags = getAllTags();
+    // Get usage count for each tag
+    const tagsWithUsage = tags.map((tag) => {
+      const docs = getDocumentsByTag(tag);
+      return { name: tag, inUse: docs.length > 0, documentCount: docs.length };
+    });
+    return res.json({ code: 0, data: tagsWithUsage });
+  } catch (err) {
+    console.error("Failed to get tags:", err);
+    return res.status(500).json({ code: 500, error: "Failed to get tags" });
+  }
+});
+
+// GET /api/knowledge/tags/:tag - Get documents with specific tag
+knowledgeRouter.get("/tags/:tag", (req, res) => {
+  try {
+    const { tag } = req.params;
+    const documents = getDocumentsByTag(tag);
+    const safeDocs = documents.map(({ rawPath, ...rest }) => rest);
+    return res.json({ code: 0, data: safeDocs });
+  } catch (err) {
+    console.error("Failed to get documents by tag:", err);
+    return res.status(500).json({ code: 500, error: "Failed to get documents by tag" });
+  }
+});
+
+// DELETE /api/knowledge/tags/:tag - Remove a tag from all documents
+knowledgeRouter.delete("/tags/:tag", (req, res) => {
+  try {
+    const { tag } = req.params;
+    const removedCount = removeTagFromAllDocuments(tag);
+    return res.json({
+      code: 0,
+      data: {
+        success: true,
+        tag,
+        removedFrom: removedCount,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to delete tag:", err);
+    return res.status(500).json({ code: 500, error: "Failed to delete tag" });
+  }
+});
+
+// POST /api/knowledge/tags/:oldTag/rename - Rename a tag across all documents
+knowledgeRouter.post("/tags/:oldTag/rename", (req, res) => {
+  try {
+    const { oldTag } = req.params;
+    const { newTag } = req.body;
+
+    if (!newTag || typeof newTag !== "string" || !newTag.trim()) {
+      return res.status(400).json({ code: 400, error: "newTag is required" });
+    }
+
+    const renamedCount = renameTag(oldTag, newTag.trim());
+    return res.json({
+      code: 0,
+      data: {
+        success: true,
+        oldTag,
+        newTag: newTag.trim(),
+        renamed: renamedCount,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to rename tag:", err);
+    return res.status(500).json({ code: 500, error: "Failed to rename tag" });
+  }
+});
+
 // POST /api/knowledge/query - Query the wiki
 knowledgeRouter.post("/query", async (req, res) => {
   try {
-    const { question } = req.body;
+    const { question, tag } = req.body;
 
     if (!question || typeof question !== "string") {
       return res.status(400).json({ code: 400, error: "Question is required" });
     }
 
-    const result = await queryWiki(question);
+    const result = await queryWiki(question, tag);
 
     return res.json({
       code: 0,
@@ -126,6 +329,8 @@ knowledgeRouter.post("/query", async (req, res) => {
         pagesCount: result.pages.length,
         chunksFound: result.chunksFound,
         citations: result.citations,
+        sources: result.sources,
+        filteredByTag: result.filteredByTag,
       },
     });
   } catch (err) {

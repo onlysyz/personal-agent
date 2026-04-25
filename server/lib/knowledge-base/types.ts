@@ -10,6 +10,7 @@ export interface RawDocument {
   size: number;
   uploadedAt: string;
   rawPath: string; // Path to raw file in data/knowledge/raw/
+  tags: string[];  // User-defined tags for filtering and organization
 }
 
 export interface WikiPage {
@@ -19,6 +20,7 @@ export interface WikiPage {
   category: 'summary' | 'entity' | 'concept' | 'comparison' | 'overview';
   sourceIds: string[];    // Which raw documents this page references
   linkedPages: string[];  // Cross-references to other wiki pages
+  tags: string[];         // User-defined tags for filtering
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +31,7 @@ export interface WikiIndex {
     title: string;
     summary: string;     // One-line description
     category: string;
+    tags: string[];
     updatedAt: string;
   }[];
 }
@@ -72,6 +75,7 @@ export interface DocumentChunk {
   chunkIndex: number;
   metadata: {
     filename: string;
+    tags?: string[];      // Tags from source document (optional until set during embedding)
     startLine?: number;
     endLine?: number;
   };
@@ -89,6 +93,7 @@ export interface SemanticSearchResult {
   score: number;
   metadata: {
     filename: string;
+    tags: string[];
   };
 }
 

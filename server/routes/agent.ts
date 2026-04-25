@@ -157,9 +157,13 @@ async function streamWithAgent(
       // Get knowledge context from wiki
       const userQuestion = messages.length > 0 ? messages[messages.length - 1].content : "";
       let knowledgeContext = "";
+      let knowledgeSources: string[] = [];
+      let knowledgeCitations: string[] = [];
       if (userQuestion) {
         try {
           const queryResult = await queryWiki(userQuestion);
+          knowledgeSources = queryResult.sources;
+          knowledgeCitations = queryResult.citations;
           // Use pages if available (keyword fallback), otherwise use answer (semantic search)
           if (queryResult.pages.length > 0) {
             knowledgeContext = queryResult.pages
@@ -210,8 +214,11 @@ ${JSON.stringify(publicProfile, null, 2)}
       const model = await createModel();
 
       // Convert to LangChain messages
+      const sourcesSection = knowledgeSources.length > 0
+        ? `\n\n---\n**参考来源**: ${knowledgeSources.join(", ")}`
+        : "";
       const knowledgeSection = knowledgeContext
-        ? `\n\n## 知识库上下文\n\n${knowledgeContext}`
+        ? `\n\n## 知识库上下文\n\n${knowledgeContext}${sourcesSection}`
         : "";
       const langchainMessages = [
         new SystemMessage(systemPrompt + "\n\n" + contextPrompt + knowledgeSection),
@@ -220,6 +227,11 @@ ${JSON.stringify(publicProfile, null, 2)}
 
       // Full response accumulator for decision mode
       let fullResponse = "";
+
+      // Send sources event if knowledge was found
+      if (knowledgeSources.length > 0) {
+        res.write(`data: ${JSON.stringify({ type: "sources", sources: knowledgeSources, citations: knowledgeCitations })}\n\n`);
+      }
 
       // Stream the response
       const stream = await model.stream(langchainMessages);

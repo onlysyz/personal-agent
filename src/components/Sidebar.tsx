@@ -9,7 +9,8 @@ import {
   Rocket,
   BookOpen,
   LifeBuoy,
-  Cpu
+  Cpu,
+  BookMarked
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -25,6 +26,7 @@ export default function Sidebar() {
   const navItems = [
     { name: 'Dashboard', icon: BarChart3, path: '/' },
     { name: t('decisionMaker.title'), icon: BrainCircuit, path: '/decision-maker' },
+    { name: t('knowledgeBase.title') || 'Knowledge Base', icon: BookMarked, path: '/knowledge-base' },
     { name: t('publicProfile.title'), icon: UserCircle, path: '/public-profile' },
     { name: t('dataEditor.title'), icon: Database, path: '/data-editor' },
   ];

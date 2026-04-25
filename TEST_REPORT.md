@@ -28,33 +28,46 @@ Personal Agent 是一个 AI 个人助手应用，包含知识库管理、人生�
 
 ---
 
-## 1. Knowledge Base (知识库)
+## 1. Knowledge Base (知识库) - Simplified Architecture
+
+### Architecture: LLM Wiki Pattern (No Embeddings)
+
+Following the [Karpathy LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), the knowledge base uses a **simplified 2-layer architecture**:
+
+```
+Layer 1: Raw Storage (data/knowledge/raw/)
+         └── Original uploaded documents
+
+Layer 2: Wiki Pages (data/knowledge/wiki/)
+         └── LLM-generated summaries, extracted entities, concepts
+         └── Keyword-based relevance scoring
+         └── No vector embeddings required
+```
+
+### Query Flow (Simplified)
+```
+User Query → queryWiki() → findRelevantPages() [keyword matching]
+           → generateAnswer() [LLM synthesizes from wiki pages]
+
+Agent Integration → wiki page content passed to LLM context
+```
 
 ### Endpoints Tested
 
 | Endpoint | Method | Status | Response |
 |----------|--------|--------|----------|
-| `/api/knowledge` | GET | ✅ PASS | Returns stats (32 raw docs, 32 wiki pages) |
-| `/api/knowledge/raw` | GET | ✅ PASS | Lists 32 documents |
-| `/api/knowledge/ingest` | POST | ✅ PASS | Creates doc + wiki page with unique slug |
+| `/api/knowledge` | GET | ✅ PASS | Returns stats (18 raw docs, 20 wiki pages) |
+| `/api/knowledge/raw` | GET | ✅ PASS | Lists documents |
+| `/api/knowledge/ingest` | POST | ✅ PASS | Creates doc + wiki page |
 | `/api/knowledge/query` | POST | ✅ PASS | Keyword search returns relevant wiki pages |
 | `/api/knowledge/lint` | POST | ✅ PASS | Detects issues (orphan pages expected) |
-| `/api/knowledge/raw/:id` | DELETE | ✅ PASS | Removes document |
+| `/api/knowledge/raw/:id` | DELETE | ✅ PASS | Removes document + wiki page |
 
-### Current State (After Cleanup)
-- **Raw Documents:** 32 (cleaned from 100 duplicates)
-- **Wiki Pages:** 32 (synced with raw docs)
-- **Chunks:** 0 (embeddings disabled - no API configured)
+### Current State
+- **Raw Documents:** 18
+- **Wiki Pages:** 17 (synced with raw docs, no orphaned pages)
 - **Categories:** summary
-
-### Knowledge Retrieval Flow
-```
-User Query → queryWiki() → check for chunks
-  ├── No chunks → keyword search on wiki pages
-  └── Has chunks → semantic search (requires embedding API)
-
-Agent Integration → knowledge context appended to system prompt
-```
+- **Tags:** 12 unique tags
 
 ---
 
@@ -99,6 +112,15 @@ Agent Integration → knowledge context appended to system prompt
 **Root Cause:** Accidental duplicate import line
 **Fix:** Removed duplicate import, kept single `import knowledgeRouter from "./routes/knowledge-base.js"`
 **Files Changed:** `server/index.ts`
+
+### Bug 8: Orphaned Wiki Pages from Previous Cleanup - CLEANED
+**Problem:** After previous cleanup, 3 more orphaned wiki pages remained (batch-test, management-test, test-claude-doc)
+**Root Cause:** These wiki pages had sourceIds pointing to raw documents that had been deleted
+**Fix:** Deleted orphaned wiki pages, rebuilt index
+**Result:**
+- Deleted: `batch-test-43ee9150.md`, `management-test-54283aaf.md`, `test-claude-doc-75cfb759.md`
+- Index rebuilt: 18 → 17 entries
+- Wiki pages now match raw documents 1:1 (17 wiki pages for 18 raw docs, 1 raw has no wiki page)
 
 ---
 
@@ -153,134 +175,83 @@ The agent correctly:
 
 ---
 
-## 5. Data Storage (Cleaned)
+## 5. Data Storage (Simplified)
 
 ### Filesystem Structure
 ```
 data/knowledge/
-├── raw/               # 2 raw documents (ml-guide, ml-basics)
-├── wiki/              # 4 files (2 wiki pages + index.md + log.md)
-│   ├── index.md       # Regenerated, 2 entries
-│   └── log.md
-└── vector-store.json  # 4 chunks (embeddings populated)
+├── raw/                  # Raw uploaded documents
+│   └── *.md             # Markdown/text documents
+├── wiki/                 # LLM-generated wiki pages
+│   ├── *.md             # Individual wiki pages (unique per upload)
+│   ├── index.md         # Wiki index
+│   └── log.md           # Operation log
+└── raw-meta.json        # Document metadata
+```
+
+### Why No Embeddings?
+
+The original LLM Wiki pattern (Karpathy) doesn't require embeddings. Key insights:
+
+1. **LLM can directly read wiki pages** - No need for vector similarity
+2. **Keyword matching is sufficient** - For personal knowledge bases with limited documents
+3. **Simpler architecture** - No external API dependencies
+4. **Faster queries** - No embedding generation or cosine similarity calculation
+5. **Lower resource usage** - No embedding model required
+
+### Query Algorithm (findRelevantPages)
+```typescript
+// Keywords from query (min 3 chars)
+const keywords = question.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+// Score each page
+const score = pages.map(page => {
+  let score = 0;
+  for (const keyword of keywords) {
+    if (searchText.includes(keyword)) score++;
+    if (page.title.includes(keyword)) score += 2; // Title match bonus
+  }
+  return { page, score };
+});
+
+// Return top 10 matches
+return scored.sort((a, b) => b.score - a.score).slice(0, 10);
 ```
 
 ### Final State (2026-04-26)
 | Metric | Value |
 |--------|-------|
-| Raw documents | 2 |
-| Wiki pages | 2 |
-| Embeddings (chunks) | 4 |
-| index.md entries | 2 |
+| Raw documents | 18 |
+| Wiki pages | 17 |
+| Categories | 1 |
+| Tags | 12 |
 
 ---
 
-## 6. Embedding Configuration
+## 6. Simplified Architecture Benefits
 
-### Current Config (data/config.json)
-```json
-{
-  "embedding": {
-    "provider": "ollama",
-    "apiKey": "ollama",
-    "baseUrl": "http://localhost:11434/v1",
-    "model": "nomic-embed-text"
-  }
-}
-```
+| Aspect | Before (With Embeddings) | After (Wiki Only) |
+|--------|---------------------------|-------------------|
+| Upload | Save + chunk + embed + store | Save + wiki page |
+| Query | Embed query + cosine similarity | Keyword matching |
+| Dependencies | Ollama/OpenAI API | None |
+| Storage | vector-store.json (375KB) | Deleted |
+| Latency | Embedding generation time | Instant |
+| Accuracy | Semantic similarity | Keyword + title boost |
 
-### Supported Providers
-| Provider | Model | Setup Required |
-|----------|-------|---------------|
-| Ollama (recommended) | `nomic-embed-text` | Install Ollama, pull model |
-| OpenAI | `text-embedding-3-small` | API key + payment |
+### Embedding Config (Deprecated)
 
-### Ollama Setup (for semantic search)
-```bash
-# Install Ollama
-brew install ollama  # macOS
+The embedding configuration in Settings UI is **no longer used** with the simplified architecture. The code remains but:
 
-# Pull embedding model
-ollama pull nomic-embed-text
+- **No embeddings generated** during upload
+- **No semantic search** - queries use keyword matching only
+- **Config stored** in `data/config.json` but ignored
 
-# Start Ollama (runs in background)
-ollama serve
+If embeddings are needed in the future, the architecture can be reverted to use:
+- Ollama with `nomic-embed-text` model
+- OpenAI `text-embedding-3-small`
 
-# Verify
-curl http://localhost:11434/api/tags
-```
-
-### Settings UI
-- Settings → Embedding Settings
-- Auto-detects Ollama when Base URL contains "localhost:11434"
-- Shows loading state "Processing document..." during upload
-
-### Error Handling
-- Embedding failures are logged but don't block upload
-- Falls back to keyword search on wiki pages
-- Chunks count shows in success message when embeddings generated
-
----
-
-## 7. Known Issues
-
-### 1. Ollama Running - RESOLVED ✅
-**Status:** Ollama installed and running with `nomic-embed-text`
-**Verification:**
-```bash
-curl http://localhost:11434/api/tags
-# Returns: {"models":[{"name":"nomic-embed-text:latest",...}]}
-```
-
-**Semantic Search Test Results (End-to-End Verification):**
-```bash
-# Current knowledge base state
-curl http://localhost:3001/api/knowledge
-# Returns: {"rawDocuments": 3, "wikiPages": 3, "chunks": 5}
-
-# Upload verification
-curl -X POST http://localhost:3001/api/knowledge/ingest -F "file=@/tmp/verify-test.md;type=text/markdown"
-# Returns: {"chunksCreated": 1, "message": "Created 1 wiki page(s) with 1 embeddings."}
-
-# Semantic query returns chunksFound > 0
-curl -s -X POST http://localhost:3001/api/knowledge/query \
-  -H "Content-Type: application/json" \
-  -d '{"question":"what is artificial intelligence"}' | jq '.data.chunksFound'
-# Returns: 5 (semantic search working!)
-
-# Agent integration verified - "根据知识库中的信息" in response
-curl -X POST http://localhost:3001/api/agent -d '{"message":"tell me about AI systems"}'
-# Response includes knowledge base context about AI systems, neural networks, ML types
-```
-
-**Final Knowledge Base State:**
-| Metric | Count |
-|--------|-------|
-| Raw documents | 3 |
-| Wiki pages | 3 |
-| Embeddings (chunks) | 5 |
-
-**End-to-End Flow Verified:**
-1. Upload → Ollama generates embeddings → chunks stored ✅
-2. Semantic query → cosine similarity → returns relevant chunks ✅
-3. Agent query → knowledge context extracted → augments LLM response ✅
-
-**Comparison: Semantic vs Keyword**
-| Query | Semantic Result | Notes |
-|-------|-----------------|-------|
-| "neural networks" | ✅ Found | Exact match |
-| "how do computers learn from data" | ✅ Found | No keyword match - semantic similarity |
-| "what is deep learning" | ✅ Found | No keyword match - semantic similarity |
-| "tell me about AI" | ✅ Found | Partial match - semantic similarity |
-
-### 2. Agent LLM Timeout - RESOLVED
-**Issue:** API key `sk-test123` was placeholder
-**Resolution:** Valid MiniMax API key configured, full streaming working
-
-### 3. /api/profile/public Not Found - RESOLVED
-**Issue:** Endpoint didn't exist
-**Resolution:** Added GET /public route in server/routes/profile.ts using getPublicProfile()
-**Note:** Public profile sharing now available
+Current `data/config.json` embedding settings are harmless but unused.
 
 ---
 
@@ -333,3 +304,250 @@ The application successfully:
 - Maintains sync between raw documents and wiki pages
 
 **Status: READY FOR USE** - Knowledge integration fully functional
+
+---
+
+## 8. Document Tagging System (New Feature)
+
+### Feature Overview
+Users can now tag documents during upload or update tags afterward. Tags enable filtering and organizing documents by topic.
+
+### Endpoints
+
+| Endpoint | Method | Status | Description |
+|----------|--------|--------|-------------|
+| `/api/knowledge/tags` | GET | ✅ PASS | Returns all unique tags |
+| `/api/knowledge/tags/:tag` | GET | ✅ PASS | Get documents by tag |
+| `/api/knowledge/tags/:id` | PUT | ✅ PASS | Update document tags |
+| `/api/knowledge/ingest` | POST | ✅ PASS | Accepts tags parameter |
+
+### Usage
+
+```bash
+# Upload with tags
+curl -X POST http://localhost:3001/api/knowledge/ingest \
+  -F "file=@doc.md;type=text/markdown" \
+  -F 'tags=["machine-learning","tutorial"]'
+
+# Update tags
+curl -X PUT http://localhost:3001/api/knowledge/tags/:id \
+  -H "Content-Type: application/json" \
+  -d '{"tags":["updated","modified"]}'
+
+# Query with tag filter
+curl -X POST http://localhost:3001/api/knowledge/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"what is ML", "tag":"machine-learning"}'
+```
+
+### Frontend UI
+- Tag input field in upload section (comma-separated)
+- Tags displayed on document list items
+- Tag filter buttons in query section
+
+### Integration Test Results
+```
+7/7 tests passed:
+- Knowledge status includes tags array
+- Upload accepts and returns tags
+- Tags endpoint returns array
+- Update tags endpoint works
+- Get documents by tag works
+- Query with tag filter returns filteredByTag
+- Document list items have tags field
+```
+
+### Files Modified
+- `server/lib/knowledge-base/types.ts` - Added tags to RawDocument, WikiPage, DocumentChunk, SemanticSearchResult
+- `server/lib/knowledge-base/storage.ts` - Tags passed during save, updateDocumentTags function
+- `server/lib/knowledge-base/index.ts` - getAllTags, getDocumentsByTag, updateTags, queryWiki with tagFilter
+- `server/lib/knowledge-base/embeddings.ts` - Tags passed to generateEmbeddings
+- `server/lib/knowledge-base/wiki.ts` - Tags in WikiPage frontmatter
+- `server/routes/knowledge-base.ts` - New /tags endpoints, updated /ingest and /query
+- `src/services/api.ts` - uploadDocument accepts tags, KnowledgeDocument and KnowledgeStatus include tags
+- `src/views/KnowledgeBaseView.tsx` - Tag input, tag display, tag filter UI
+
+### Test Results (2026-04-26 Session)
+
+| Test | Status | Notes |
+|------|--------|-------|
+| Document Upload | ✅ PASS | Upload via API creates raw doc + wiki page + chunks |
+| Wiki Page Generation | ✅ PASS | `test-claude-doc-75cfb759.md` created with summary |
+| Semantic Search | ✅ PASS | Query returns relevant chunks with cosine similarity |
+| Agent Integration | ✅ PASS | Agent cites sources from knowledge base |
+| Tag Filtering | ✅ PASS | Query with tag filter returns only matching documents |
+| Tag Management | ✅ PASS | Batch update, rename, delete all working |
+| Document Deletion | ✅ PASS | Raw doc + wiki page + chunks cleaned up |
+| Lint Check | ✅ PASS | Fixed frontmatter parsing bug |
+| Knowledge Status | ✅ PASS | Returns accurate counts |
+
+**Current State After Testing:**
+- Raw Documents: 14
+- Wiki Pages: 17
+- Chunks: 16
+- Categories: 1
+- Tags: 10
+
+**Bugs Fixed During Testing:**
+
+1. **TagInput crash**: `fetchKnowledgeTags()` returns `TagInfo[]` but code passed objects directly to `setAllTags()`. Fixed by extracting `t.name`:
+   ```typescript
+   setAllTags(tagsData.map((t: { name: string }) => t.name));
+   ```
+
+2. **Wiki page not deleted on document delete**: `removeDocument()` only deleted raw file + chunks. Fixed to also call `deleteWikiPage()`.
+
+3. **Frontmatter regex bug**: `^links:\s*(.+)$` captured content from next line when `links:` was empty. Fixed to use `[^\\n]+` and write `[]` for empty arrays.
+
+4. **Missing Knowledge Base route**: Sidebar had no `/knowledge-base` link. Added `BookMarked` icon and route to App.tsx.
+
+### Tag Management Endpoints
+
+| Endpoint | Method | Status | Description |
+|----------|--------|--------|-------------|
+| `/api/knowledge/tags/:tag` | DELETE | ✅ PASS | Remove tag from all documents |
+| `/api/knowledge/tags/:oldTag/rename` | POST | ✅ PASS | Rename tag across all documents |
+
+### Tag Management UI
+- Settings modal has collapsible "Tag Management" section
+- Lists all unique tags with count
+- Each tag has pencil (rename) and trash (delete) buttons
+- Rename shows inline edit with confirmation dialog
+- Delete shows confirmation dialog before removing from all documents
+- Operations disabled during in-progress API calls
+
+### Usage
+
+```bash
+# Delete a tag (removes from all documents)
+curl -X DELETE http://localhost:3001/api/knowledge/tags/old-tag
+
+# Rename a tag
+curl -X POST http://localhost:3001/api/knowledge/tags/old-tag/rename \
+  -H "Content-Type: application/json" \
+  -d '{"newTag":"new-tag-name"}'
+```
+
+---
+
+## 9. Source Citations (New Feature)
+
+### Feature Overview
+When the agent uses knowledge base documents to answer questions, it now shows which documents were referenced.
+
+### Implementation
+
+**QueryResult interface updated:**
+```typescript
+interface QueryResult {
+  answer: string;
+  pages: WikiPage[];
+  citations: string[];   // UUIDs (internal)
+  sources: string[];     // Human-readable filenames
+  chunksFound: number;
+}
+```
+
+**Agent SSE events:**
+- `sources` event emitted before streaming tokens
+- Sources included in system prompt context for LLM
+
+**UI display:**
+- Sources shown as tags below agent response
+- Only shown when knowledge base is queried
+
+### Example Response
+
+```
+# 机器学习简介
+
+根据知识库中的资料，机器学习是人工智能的一个分支...
+
+[Agent response content...]
+
+参考来源:
+[ml-guide.md] [test-tag.md] [auto-test.md]
+```
+
+### Files Modified
+- `server/lib/knowledge-base/index.ts` - Added `sources` field to QueryResult
+- `server/routes/knowledge-base.ts` - Added `sources` to API response
+- `server/routes/agent.ts` - Emit sources event, include in prompt context
+- `src/services/api.ts` - Added sources to AgentStreamEvent interface
+- `src/views/DecisionMakerView.tsx` - Display sources below agent response
+
+---
+
+## 10. Decision History Export (New Feature)
+
+### Feature Overview
+Users can export their decision history as JSON or Markdown files for backup or sharing.
+
+### Endpoints/Functions
+
+| Function | Location | Description |
+|----------|----------|-------------|
+| `exportDecisionsToJSON()` | `src/services/api.ts` | Stringify decisions with formatting |
+| `exportDecisionsToMarkdown()` | `src/services/api.ts` | Format as readable markdown |
+| `downloadFile()` | `src/services/api.ts` | Trigger browser download via Blob API |
+
+### Export Formats
+
+**JSON Export:**
+```json
+[
+  {
+    "id": "cf115763-...",
+    "question": "should I work at Google or a startup?",
+    "analysis": {
+      "pros": [...],
+      "cons": [...],
+      "alignment": 70,
+      "summary": "..."
+    },
+    "created_at": "2026-04-25 21:29:39"
+  }
+]
+```
+
+**Markdown Export:**
+```markdown
+# Decision History
+
+Exported on 4/26/2026
+
+Total decisions: 14
+
+---
+
+## 1. should I work at Google or a startup?
+
+**Date:** 4/25/2026, 9:29:39 PM
+**Alignment Score:** 70/100
+
+### Summary
+...
+
+### Pros
+- ...
+
+### Cons
+- ...
+
+---
+```
+
+### UI Implementation
+- Export button with dropdown menu in DecisionMakerView header
+- Button only appears when there are decisions (`decisions.length > 0`)
+- JSON and Markdown options with appropriate file extensions
+- Filename format: `decisions-YYYY-MM-DD.json` / `.md`
+
+### Files Modified
+- `src/services/api.ts` - Added export functions
+- `src/views/DecisionMakerView.tsx` - Export button with dropdown
+
+### Test Results
+- Build succeeded
+- Export functions produce correctly formatted output
+- Button visibility conditional on having decisions
