@@ -9,6 +9,10 @@ settingsRouter.get("/", (_req, res) => {
   const safeConfig = {
     ...config,
     apiKey: config.apiKey ? "***" + config.apiKey.slice(-4) : "",
+    embedding: config.embedding ? {
+      ...config.embedding,
+      apiKey: config.embedding.apiKey ? "***" + config.embedding.apiKey.slice(-4) : "",
+    } : undefined,
   };
   return res.json({ code: 0, data: safeConfig });
 });
@@ -94,7 +98,7 @@ settingsRouter.post("/test", async (req, res) => {
 });
 
 settingsRouter.put("/", (req, res) => {
-  const { provider, apiKey, baseUrl, model } = req.body;
+  const { provider, apiKey, baseUrl, model, embedding } = req.body;
 
   if (!model) {
     return res.status(400).json({ code: 400, error: "Model is required" });
@@ -127,6 +131,16 @@ settingsRouter.put("/", (req, res) => {
 
   if (baseUrl !== undefined) {
     configUpdate.baseUrl = baseUrl;
+  }
+
+  // Handle embedding config
+  if (embedding) {
+    configUpdate.embedding = {
+      provider: embedding.provider || "openai",
+      apiKey: embedding.apiKey && !embedding.apiKey.startsWith("***") ? embedding.apiKey : "",
+      baseUrl: embedding.baseUrl || "",
+      model: embedding.model || "text-embedding-3-small",
+    };
   }
 
   try {

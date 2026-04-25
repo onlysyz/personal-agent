@@ -7,11 +7,21 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
+interface EmbeddingConfig {
+  provider: string;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { t } = useTranslation();
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [model, setModel] = useState("");
+  const [embeddingApiKey, setEmbeddingApiKey] = useState("");
+  const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState("");
+  const [embeddingModel, setEmbeddingModel] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -44,6 +54,16 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         setApiKey(data.data.apiKey || "");
         setBaseUrl(data.data.baseUrl || "");
         setModel(data.data.model || "");
+        // Load embedding config
+        if (data.data.embedding) {
+          setEmbeddingApiKey(data.data.embedding.apiKey || "");
+          setEmbeddingBaseUrl(data.data.embedding.baseUrl || "");
+          setEmbeddingModel(data.data.embedding.model || "text-embedding-3-small");
+        } else {
+          setEmbeddingApiKey("");
+          setEmbeddingBaseUrl("");
+          setEmbeddingModel("text-embedding-3-small");
+        }
       }
     } catch (err) {
       setError("Failed to load settings");
@@ -106,6 +126,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           apiKey,
           baseUrl,
           model,
+          embedding: {
+            provider: "openai",
+            apiKey: embeddingApiKey,
+            baseUrl: embeddingBaseUrl,
+            model: embeddingModel || "text-embedding-3-small",
+          },
         }),
       });
       const data = await res.json();
@@ -210,6 +236,62 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   placeholder="gpt-4o, claude-3-5-sonnet-latest, ..."
                   className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 />
+              </div>
+
+              {/* Embedding Section */}
+              <div className="border-t border-outline-variant/30 pt-5 mt-2">
+                <h3 className="text-sm font-semibold text-on-surface mb-3 flex items-center gap-2">
+                  <Key className="w-4 h-4 text-on-surface-variant" />
+                  Embedding Settings (for Knowledge Base)
+                </h3>
+                <p className="text-xs text-on-surface-variant mb-4">
+                  Separate API for embeddings (MiniMax doesn't support embeddings)
+                </p>
+
+                {/* Embedding API Key */}
+                <div className="mb-4">
+                  <label className="flex items-center gap-2 text-sm font-medium text-on-surface mb-2">
+                    <Key className="w-4 h-4 text-on-surface-variant" />
+                    Embedding API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={embeddingApiKey}
+                    onChange={(e) => setEmbeddingApiKey(e.target.value)}
+                    placeholder="OpenAI API key for embeddings"
+                    className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  />
+                </div>
+
+                {/* Embedding Base URL */}
+                <div className="mb-4">
+                  <label className="flex items-center gap-2 text-sm font-medium text-on-surface mb-2">
+                    <Globe className="w-4 h-4 text-on-surface-variant" />
+                    Embedding Base URL
+                  </label>
+                  <input
+                    type="text"
+                    value={embeddingBaseUrl}
+                    onChange={(e) => setEmbeddingBaseUrl(e.target.value)}
+                    placeholder="https://api.openai.com/v1"
+                    className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  />
+                </div>
+
+                {/* Embedding Model */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-on-surface mb-2">
+                    <Cpu className="w-4 h-4 text-on-surface-variant" />
+                    Embedding Model
+                  </label>
+                  <input
+                    type="text"
+                    value={embeddingModel}
+                    onChange={(e) => setEmbeddingModel(e.target.value)}
+                    placeholder="text-embedding-3-small"
+                    className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  />
+                </div>
               </div>
 
               {/* Test Button */}

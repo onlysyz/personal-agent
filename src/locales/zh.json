@@ -138,5 +138,29 @@
     "baseUrl": "API 地址",
     "model": "模型",
     "saved": "设置保存成功！"
+  },
+  "knowledge": {
+    "title": "知识库",
+    "subtitle": "你的个人维基。上传文档后，AI 会维护摘要、实体和交叉引用。",
+    "upload": "上传文档",
+    "dropFiles": "拖放文件到此处或点击浏览",
+    "uploading": "上传中...",
+    "search": "搜索维基",
+    "queryWiki": "查询维基",
+    "queryPlaceholder": "向你的知识库提问...",
+    "ask": "提问",
+    "answer": "回答",
+    "rawSources": "原始文档",
+    "documents": "文档",
+    "noDocuments": "暂无文档",
+    "searchResults": "搜索结果",
+    "noResults": "未找到结果",
+    "match": "匹配度",
+    "emptyTitle": "知识库为空",
+    "emptyDesc": "上传文档开始构建你的个人维基。AI 会创建摘要并维护交叉引用。",
+    "wikiStats": "维基统计",
+    "categories": "分类",
+    "lint": "健康检查",
+    "chunks": "文本块"
   }
 }

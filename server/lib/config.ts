@@ -4,11 +4,19 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+export interface EmbeddingConfig {
+  provider: "openai" | "ollama";
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
 export interface ServerConfig {
   provider: "anthropic" | "openai" | "ollama";
   apiKey: string;
   baseUrl: string;
   model: string;
+  embedding?: EmbeddingConfig;
 }
 
 const CONFIG_PATH = path.join(__dirname, "../../data/config.json");
@@ -18,6 +26,12 @@ const DEFAULT_CONFIG: ServerConfig = {
   apiKey: "",
   baseUrl: "",
   model: "claude-sonnet-4-5-20250929",
+  embedding: {
+    provider: "openai",
+    apiKey: "",
+    baseUrl: "",
+    model: "text-embedding-3-small",
+  },
 };
 
 export function getServerConfig(): ServerConfig {

@@ -247,3 +247,75 @@ export async function chatWithAgent(
 
   return { reply, threadId };
 }
+
+// Knowledge Base API - LLM Wiki Pattern
+export interface KnowledgeDocument {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+}
+
+export interface KnowledgeStatus {
+  rawDocuments: number;
+  wikiPages: number;
+  chunks: number;
+  categories: string[];
+}
+
+export async function fetchKnowledgeStatus(): Promise<KnowledgeStatus> {
+  return fetchWithRetry(`${API_BASE}/knowledge`);
+}
+
+export async function fetchKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
+  return fetchWithRetry(`${API_BASE}/knowledge/raw`);
+}
+
+export async function uploadDocument(file: File): Promise<{ success: boolean; filename: string; wikiPagesCreated: number }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE}/knowledge/ingest`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const json = await response.json().catch(() => ({}));
+    throw new Error(json.error || `Upload failed: ${response.status}`);
+  }
+
+  const json = await response.json();
+  if (json.code !== 0) {
+    throw new Error(json.error || "Upload failed");
+  }
+  return json.data;
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+  await fetchWithRetry(`${API_BASE}/knowledge/raw/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function queryKnowledge(question: string): Promise<{ answer: string; pagesCount: number; citations: string[] }> {
+  return fetchWithRetry(`${API_BASE}/knowledge/query`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+}
+
+export interface LintResult {
+  contradictions: string[];
+  staleClaims: string[];
+  orphanPages: string[];
+  missingLinks: string[];
+}
+
+export async function lintKnowledge(): Promise<LintResult> {
+  return fetchWithRetry(`${API_BASE}/knowledge/lint`, {
+    method: "POST",
+  });
+}
