@@ -160,10 +160,15 @@ async function streamWithAgent(
       if (userQuestion) {
         try {
           const queryResult = await queryWiki(userQuestion);
+          // Use pages if available (keyword fallback), otherwise use answer (semantic search)
           if (queryResult.pages.length > 0) {
             knowledgeContext = queryResult.pages
               .map(p => `## ${p.title}\n\n${p.content}`)
               .join("\n\n---\n\n");
+          } else if (queryResult.chunksFound > 0 && queryResult.answer) {
+            // Semantic search returned results but pages is empty - extract context from answer
+            const match = queryResult.answer.match(/Based on the knowledge base:\s*\n*\s*(.+)/s);
+            knowledgeContext = match ? match[1] : queryResult.answer;
           }
         } catch (e) {
           console.warn("Knowledge query failed:", e);
