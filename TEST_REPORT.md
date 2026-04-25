@@ -158,12 +158,22 @@ The agent correctly:
 ### Filesystem Structure
 ```
 data/knowledge/
-├── raw/               # 32 raw documents (cleaned)
-├── wiki/              # 32 wiki pages + index.md + log.md
-│   ├── index.md       # Regenerated, properly formatted
+├── raw/               # 2 raw documents (ml-guide, ml-basics)
+├── wiki/              # 4 files (2 wiki pages + index.md + log.md)
+│   ├── index.md       # Regenerated, 2 entries
 │   └── log.md
 └── vector-store.json  # Empty (embeddings disabled)
 ```
+
+### Cleanup Results (2026-04-26)
+| Metric | Before | After |
+|--------|--------|-------|
+| Raw documents | 35 | 2 ✅ |
+| Wiki pages | 37 | 4 ✅ |
+| Vector store chunks | 1 | 0 ✅ |
+| index.md entries | 43 | 2 ✅ |
+
+Deleted 33 test documents and their orphaned wiki pages.
 
 ---
 
