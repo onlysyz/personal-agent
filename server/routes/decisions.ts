@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getDecisions, getDecisionById } from "../lib/db.js";
+import { getDecisions, getDecisionById, searchDecisions } from "../lib/db.js";
 
 const decisionsRouter = Router();
 
@@ -10,6 +10,20 @@ decisionsRouter.get("/", (_req, res) => {
   } catch (err) {
     console.error("Failed to get decisions:", err);
     return res.status(500).json({ code: 500, error: "Failed to get decisions" });
+  }
+});
+
+decisionsRouter.get("/search", (req, res) => {
+  try {
+    const keyword = req.query.keyword as string;
+    if (!keyword) {
+      return res.status(400).json({ code: 400, error: "Keyword is required" });
+    }
+    const decisions = searchDecisions(keyword);
+    return res.json({ code: 0, data: decisions });
+  } catch (err) {
+    console.error("Failed to search decisions:", err);
+    return res.status(500).json({ code: 500, error: "Failed to search decisions" });
   }
 });
 
