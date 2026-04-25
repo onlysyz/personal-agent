@@ -272,7 +272,7 @@ export async function fetchKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
   return fetchWithRetry(`${API_BASE}/knowledge/raw`);
 }
 
-export async function uploadDocument(file: File): Promise<{ success: boolean; filename: string; wikiPagesCreated: number }> {
+export async function uploadDocument(file: File): Promise<{ success: boolean; filename: string; wikiPagesCreated: number; chunksCreated: number; message: string }> {
   const formData = new FormData();
   formData.append("file", file);
 

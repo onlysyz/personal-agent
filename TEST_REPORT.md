@@ -167,12 +167,59 @@ data/knowledge/
 
 ---
 
-## 6. Known Issues
+## 6. Embedding Configuration
 
-### 1. Embeddings Disabled
-**Issue:** No embedding API configured
-**Impact:** Semantic search unavailable, keyword fallback used
-**Workaround:** Configure OpenAI embedding API in Settings → Embedding Settings
+### Current Config (data/config.json)
+```json
+{
+  "embedding": {
+    "provider": "ollama",
+    "apiKey": "ollama",
+    "baseUrl": "http://localhost:11434/v1",
+    "model": "nomic-embed-text"
+  }
+}
+```
+
+### Supported Providers
+| Provider | Model | Setup Required |
+|----------|-------|---------------|
+| Ollama (recommended) | `nomic-embed-text` | Install Ollama, pull model |
+| OpenAI | `text-embedding-3-small` | API key + payment |
+
+### Ollama Setup (for semantic search)
+```bash
+# Install Ollama
+brew install ollama  # macOS
+
+# Pull embedding model
+ollama pull nomic-embed-text
+
+# Start Ollama (runs in background)
+ollama serve
+
+# Verify
+curl http://localhost:11434/api/tags
+```
+
+### Settings UI
+- Settings → Embedding Settings
+- Auto-detects Ollama when Base URL contains "localhost:11434"
+- Shows loading state "Processing document..." during upload
+
+### Error Handling
+- Embedding failures are logged but don't block upload
+- Falls back to keyword search on wiki pages
+- Chunks count shows in success message when embeddings generated
+
+---
+
+## 7. Known Issues
+
+### 1. Ollama Not Running
+**Issue:** Semantic search unavailable (0 chunks)
+**Impact:** Keyword fallback used for queries
+**Resolution:** Install and start Ollama with `nomic-embed-text` model
 
 ### 2. Agent LLM Timeout - RESOLVED
 **Issue:** API key `sk-test123` was placeholder
@@ -189,14 +236,17 @@ data/knowledge/
 
 1. **Configure Valid API Key:** ✅ DONE (MiniMax API key configured)
 
-2. **Enable Semantic Search (Optional):**
-   - Go to Settings → Embedding Settings
-   - Add OpenAI API key and base URL
-   - Enables semantic search instead of keyword fallback
+2. **Enable Semantic Search:**
+   - Install Ollama: `brew install ollama`
+   - Pull model: `ollama pull nomic-embed-text`
+   - Start: `ollama serve`
+   - Configure in Settings → Embedding Settings (auto-detects Ollama)
 
 3. **Add Public Profile Endpoint:** ✅ DONE - GET /api/profile/public implemented
 
 4. **Full Agent Testing:** ✅ DONE - Streaming + knowledge integration verified working
+
+5. **Loading State UI:** ✅ DONE - Shows "Processing document..." during upload
 
 ---
 

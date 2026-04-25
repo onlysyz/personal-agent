@@ -92,7 +92,10 @@ knowledgeRouter.post("/ingest", upload.single("file"), async (req, res) => {
         rawDocumentId: result.rawDocument.id,
         filename: result.rawDocument.filename,
         wikiPagesCreated: result.wikiPages.length,
-        message: `Document ingested. Created ${result.wikiPages.length} wiki page(s).`,
+        chunksCreated: result.chunksCreated,
+        message: result.chunksCreated > 0
+          ? `Document processed. Created ${result.wikiPages.length} wiki page(s) with ${result.chunksCreated} embeddings.`
+          : `Document ingested. Created ${result.wikiPages.length} wiki page(s).`,
       },
     });
   } catch (err) {

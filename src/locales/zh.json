@@ -144,7 +144,7 @@
     "subtitle": "你的个人维基。上传文档后，AI 会维护摘要、实体和交叉引用。",
     "upload": "上传文档",
     "dropFiles": "拖放文件到此处或点击浏览",
-    "uploading": "上传中...",
+    "uploading": "处理文档中...",
     "search": "搜索维基",
     "queryWiki": "查询维基",
     "queryPlaceholder": "向你的知识库提问...",

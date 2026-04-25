@@ -76,7 +76,7 @@ export default function KnowledgeBaseView() {
       const result = await uploadDocument(file);
       setUploadMessage({
         type: "success",
-        text: `${result.filename} uploaded. Created ${result.wikiPagesCreated} wiki pages.`,
+        text: result.message,
       });
       await loadData();
     } catch (err) {

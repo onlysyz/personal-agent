@@ -127,8 +127,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           baseUrl,
           model,
           embedding: {
-            provider: "openai",
-            apiKey: embeddingApiKey,
+            provider: embeddingBaseUrl.includes("ollama") ? "ollama" : "openai",
+            apiKey: embeddingApiKey || "ollama",
             baseUrl: embeddingBaseUrl,
             model: embeddingModel || "text-embedding-3-small",
           },
@@ -245,7 +245,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   Embedding Settings (for Knowledge Base)
                 </h3>
                 <p className="text-xs text-on-surface-variant mb-4">
-                  Separate API for embeddings (MiniMax doesn't support embeddings)
+                  Separate API for embeddings (Ollama local or OpenAI)
                 </p>
 
                 {/* Embedding API Key */}
@@ -258,7 +258,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     type="password"
                     value={embeddingApiKey}
                     onChange={(e) => setEmbeddingApiKey(e.target.value)}
-                    placeholder="OpenAI API key for embeddings"
+                    placeholder="OpenAI API key or leave empty for Ollama"
                     className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   />
                 </div>
@@ -273,7 +273,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     type="text"
                     value={embeddingBaseUrl}
                     onChange={(e) => setEmbeddingBaseUrl(e.target.value)}
-                    placeholder="https://api.openai.com/v1"
+                    placeholder="http://localhost:11434/v1 for Ollama"
                     className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   />
                 </div>
@@ -288,7 +288,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     type="text"
                     value={embeddingModel}
                     onChange={(e) => setEmbeddingModel(e.target.value)}
-                    placeholder="text-embedding-3-small"
+                    placeholder="nomic-embed-text for Ollama"
                     className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   />
                 </div>

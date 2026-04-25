@@ -144,7 +144,7 @@
     "subtitle": "Your personal wiki. Upload documents and the AI will maintain summaries, entities, and cross-references.",
     "upload": "Upload Document",
     "dropFiles": "Drop files here or click to browse",
-    "uploading": "Uploading...",
+    "uploading": "Processing document...",
     "search": "Search Wiki",
     "queryWiki": "Query Wiki",
     "queryPlaceholder": "Ask a question about your knowledge base...",
