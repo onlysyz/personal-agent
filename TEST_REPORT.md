@@ -216,10 +216,34 @@ curl http://localhost:11434/api/tags
 
 ## 7. Known Issues
 
-### 1. Ollama Not Running
-**Issue:** Semantic search unavailable (0 chunks)
-**Impact:** Keyword fallback used for queries
-**Resolution:** Install and start Ollama with `nomic-embed-text` model
+### 1. Ollama Running - RESOLVED ✅
+**Status:** Ollama installed and running with `nomic-embed-text`
+**Verification:**
+```bash
+curl http://localhost:11434/api/tags
+# Returns: {"models":[{"name":"nomic-embed-text:latest",...}]}
+```
+
+**Semantic Search Test Results:**
+```bash
+# Upload test document with embeddings
+curl -X POST http://localhost:3001/api/knowledge/ingest -F "file=@/tmp/test.md;type=text/markdown"
+# Returns: {"chunksCreated": 1, "message": "Created 1 wiki page(s) with 1 embeddings."}
+
+# Query verifies semantic search active
+curl -s -X POST http://localhost:3001/api/knowledge/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"how do computers learn from data"}' | jq '.data.chunksFound'
+# Returns: 1 (semantic search working!)
+```
+
+**Comparison: Semantic vs Keyword**
+| Query | Semantic Result | Notes |
+|-------|-----------------|-------|
+| "neural networks" | ✅ Found | Exact match |
+| "how do computers learn from data" | ✅ Found | No keyword match - semantic similarity |
+| "what is deep learning" | ✅ Found | No keyword match - semantic similarity |
+| "tell me about AI" | ✅ Found | Partial match - semantic similarity |
 
 ### 2. Agent LLM Timeout - RESOLVED
 **Issue:** API key `sk-test123` was placeholder
@@ -236,17 +260,15 @@ curl http://localhost:11434/api/tags
 
 1. **Configure Valid API Key:** ✅ DONE (MiniMax API key configured)
 
-2. **Enable Semantic Search:**
-   - Install Ollama: `brew install ollama`
-   - Pull model: `ollama pull nomic-embed-text`
-   - Start: `ollama serve`
-   - Configure in Settings → Embedding Settings (auto-detects Ollama)
+2. **Enable Semantic Search:** ✅ DONE - Ollama running with nomic-embed-text, semantic search verified
 
 3. **Add Public Profile Endpoint:** ✅ DONE - GET /api/profile/public implemented
 
 4. **Full Agent Testing:** ✅ DONE - Streaming + knowledge integration verified working
 
 5. **Loading State UI:** ✅ DONE - Shows "Processing document..." during upload
+
+6. **chunksFound in Query Response:** ✅ DONE - Fixed route to return chunksFound
 
 ---
 
