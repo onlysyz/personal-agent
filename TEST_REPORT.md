@@ -169,6 +169,16 @@ The agent correctly:
 - Settings persisted to server via `/api/settings` endpoint
 - Agent auto-reloads with new config on save
 
+### Provider Selector (New)
+- Provider dropdown: OpenAI, Anthropic, Ollama (Local)
+- Auto-fills base URL when provider changes
+- Auto-selects first model for selected provider
+- Model dropdown shows presets based on selected provider:
+  - **OpenAI**: GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo
+  - **Anthropic**: Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus, Claude 3 Sonnet
+  - **Ollama**: Llama 3, Llama 3.1, Mistral, Codellama, Qwen, DeepSeek
+- Auto-detects provider from existing baseUrl on settings load
+
 ### Resume Parser
 - Upload resumes (PDF, Markdown, Text) for profile auto-fill
 - LLM extracts: name, role, location, email, GitHub, bio, skills, experiences
