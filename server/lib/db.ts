@@ -30,6 +30,7 @@ export function initDB(): void {
       thread_id TEXT NOT NULL,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
+      title TEXT,
       mode TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -93,6 +94,7 @@ export interface ConversationMessage {
   thread_id: string;
   role: string;
   content: string;
+  title: string | null;
   mode: string | null;
   created_at: string;
 }
@@ -101,19 +103,20 @@ export function saveMessage(
   threadId: string,
   role: "user" | "assistant",
   content: string,
-  mode?: string
+  mode?: string,
+  title?: string
 ): void {
   const database = getDB();
   const stmt = database.prepare(
-    "INSERT INTO conversations (thread_id, role, content, mode, created_at) VALUES (?, ?, ?, ?, datetime('now'))"
+    "INSERT INTO conversations (thread_id, role, content, title, mode, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))"
   );
-  stmt.run(threadId, role, content, mode || null);
+  stmt.run(threadId, role, content, title || null, mode || null);
 }
 
 export function getConversation(threadId: string): ConversationMessage[] {
   const database = getDB();
   const stmt = database.prepare(
-    "SELECT id, thread_id, role, content, mode, created_at FROM conversations WHERE thread_id = ? ORDER BY created_at ASC"
+    "SELECT id, thread_id, role, content, title, mode, created_at FROM conversations WHERE thread_id = ? ORDER BY created_at ASC"
   );
   return stmt.all(threadId) as ConversationMessage[];
 }

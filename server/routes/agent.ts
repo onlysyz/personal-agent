@@ -251,7 +251,7 @@ ${JSON.stringify(publicProfile, null, 2)}
 
       // Save user message to conversation history
       try {
-        saveMessage(threadId, "user", messages[messages.length - 1].content, mode);
+        saveMessage(threadId, "user", messages[messages.length - 1].content, mode, title);
       } catch (e) {
         console.warn("Failed to save user message:", e);
       }
@@ -375,6 +375,12 @@ agentRouter.post("/", async (req, res, next) => {
     // Get conversation history for thread
     const history = getConversation(threadId);
     const historyMessages = history.map(h => ({ role: h.role, content: h.content }));
+
+    // Generate title from first message if new conversation
+    const isNewConversation = history.length === 0;
+    const title = isNewConversation
+      ? message.slice(0, 50) + (message.length > 50 ? "..." : "")
+      : undefined;
 
     // Get agent's system prompt
     const agent = createPersonalAgent();

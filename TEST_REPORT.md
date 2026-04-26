@@ -667,3 +667,33 @@ Power users can use keyboard shortcuts for common actions.
 - `src/components/KeyboardShortcutsModal.tsx` - Added Ctrl+L shortcut to list
 - `src/views/DecisionMakerView.tsx` - Added Ctrl+L keyboard shortcut
 - `src/hooks/useKeyboardShortcut.ts` - Reusable hook (already existed)
+
+---
+
+## 13. Conversation Titles (New Feature)
+
+### Feature Overview
+New conversations automatically get a title derived from the first message (first 50 characters).
+
+### Database Schema
+```sql
+ALTER TABLE conversations ADD COLUMN title TEXT;
+```
+
+### How It Works
+1. First message in new thread → extract first 50 chars as title
+2. Title passed to `saveMessage()` when `history.length === 0`
+3. Subsequent messages in same thread don't update title
+
+### API Changes
+- `saveMessage()` accepts optional 5th parameter `title`
+- Title stored in conversations table, returned via `GET /conversation/:threadId`
+
+### Limitations
+- No conversation list UI yet (title stored but not displayed)
+- Existing conversations before this feature have NULL titles
+- Title is read-only (derived from first message, not user-editable)
+
+### Files Modified
+- `server/lib/db.ts` - Added `title` column, updated `saveMessage` signature
+- `server/routes/agent.ts` - Extract title from first message when `history.length === 0`
