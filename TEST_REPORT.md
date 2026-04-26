@@ -697,3 +697,51 @@ ALTER TABLE conversations ADD COLUMN title TEXT;
 ### Files Modified
 - `server/lib/db.ts` - Added `title` column, updated `saveMessage` signature
 - `server/routes/agent.ts` - Extract title from first message when `history.length === 0`
+
+---
+
+## 14. Conversation List (New Feature)
+
+### Feature Overview
+Browse and resume past conversations from a dedicated view.
+
+### API Endpoints
+
+| Endpoint | Method | Status | Description |
+|----------|--------|--------|-------------|
+| `/api/agent/conversations` | GET | ✅ PASS | List all threads with title, mode, messageCount |
+| `/api/agent/conversation/:threadId` | GET | ✅ PASS | Get messages for a specific thread |
+
+### Usage
+
+```bash
+# List all conversations
+curl http://localhost:3001/api/agent/conversations
+
+# Get messages for a thread
+curl http://localhost:3001/api/agent/conversation/fixed-001
+```
+
+### UI Implementation
+- ConversationListView shows all threads as cards
+- Sidebar has "对话历史" nav item linking to /conversations
+- Clicking a conversation opens DecisionMakerView with `?thread=` param
+- DecisionMakerView loads conversation history on mount if thread param present
+
+### Test Results
+
+| Test | Status | Notes |
+|------|--------|-------|
+| List all conversations | ✅ PASS | Returns threadId, title, mode, messageCount |
+| Load conversation by ID | ✅ PASS | Returns user + assistant messages |
+| Sidebar navigation | ✅ PASS | Links to /conversations |
+| Thread loading in DecisionMaker | ✅ PASS | Reads ?thread= param |
+
+### Files Modified
+- `server/lib/db.ts` - Added `getAllConversations()`
+- `server/routes/agent.ts` - Added GET /conversations endpoint
+- `src/services/api.ts` - Added `fetchConversationsList()`, `fetchConversation()`
+- `src/App.tsx` - Added route for /conversations
+- `src/components/Sidebar.tsx` - Added "对话历史" nav item
+- `src/views/ConversationListView.tsx` - New component for conversation list
+- `src/views/DecisionMakerView.tsx` - Loads conversation from ?thread= param
