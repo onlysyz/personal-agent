@@ -137,29 +137,37 @@ export interface ConversationListItem {
   mode: string | null;
   created_at: string;
   messageCount: number;
+  lastMessage: string | null;
 }
 
 export function getAllConversations(): ConversationListItem[] {
   const database = getDB();
   const stmt = database.prepare(`
     SELECT
-      thread_id,
-      title,
-      mode,
-      created_at,
-      COUNT(*) as messageCount
-    FROM conversations
-    GROUP BY thread_id
-    ORDER BY MAX(created_at) DESC
+      c.thread_id,
+      c.title,
+      c.mode,
+      c.created_at,
+      COUNT(*) as messageCount,
+      (
+        SELECT content FROM conversations
+        WHERE thread_id = c.thread_id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) as lastMessage
+    FROM conversations c
+    GROUP BY c.thread_id
+    ORDER BY MAX(c.created_at) DESC
     LIMIT 50
   `);
-  const rows = stmt.all() as { thread_id: string; title: string | null; mode: string | null; created_at: string; messageCount: number }[];
+  const rows = stmt.all() as { thread_id: string; title: string | null; mode: string | null; created_at: string; messageCount: number; lastMessage: string | null }[];
   return rows.map(row => ({
     threadId: row.thread_id,
     title: row.title,
     mode: row.mode,
     created_at: row.created_at,
     messageCount: row.messageCount,
+    lastMessage: row.lastMessage,
   }));
 }
 

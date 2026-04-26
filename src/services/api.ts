@@ -476,6 +476,7 @@ export interface ConversationListItem {
   mode: string | null;
   created_at: string;
   messageCount: number;
+  lastMessage: string | null;
 }
 
 export async function fetchConversationsList(): Promise<ConversationListItem[]> {
