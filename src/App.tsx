@@ -8,6 +8,7 @@ import DecisionMakerView from './views/DecisionMakerView';
 import KnowledgeBaseView from './views/KnowledgeBaseView';
 import PublicProfileView from './views/PublicProfileView';
 import DataEditorView from './views/DataEditorView';
+import ConversationListView from './views/ConversationListView';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
               <Route path="knowledge-base" element={<KnowledgeBaseView />} />
               <Route path="public-profile" element={<PublicProfileView />} />
               <Route path="data-editor" element={<DataEditorView />} />
+              <Route path="conversations" element={<ConversationListView />} />
             </Route>
           </Routes>
         </BrowserRouter>

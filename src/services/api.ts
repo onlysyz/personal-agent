@@ -459,3 +459,29 @@ export async function clearConversation(threadId: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+export interface ConversationMessage {
+  id: number;
+  thread_id: string;
+  role: string;
+  content: string;
+  title: string | null;
+  mode: string | null;
+  created_at: string;
+}
+
+export interface ConversationListItem {
+  threadId: string;
+  title: string | null;
+  mode: string | null;
+  created_at: string;
+  messageCount: number;
+}
+
+export async function fetchConversationsList(): Promise<ConversationListItem[]> {
+  return fetchWithRetry(`${API_BASE}/agent/conversations`);
+}
+
+export async function fetchConversation(threadId: string): Promise<ConversationMessage[]> {
+  return fetchWithRetry(`${API_BASE}/agent/conversation/${threadId}`);
+}

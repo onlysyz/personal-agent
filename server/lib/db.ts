@@ -131,6 +131,38 @@ export function clearConversation(threadId: string): void {
   stmt.run(threadId);
 }
 
+export interface ConversationListItem {
+  threadId: string;
+  title: string | null;
+  mode: string | null;
+  created_at: string;
+  messageCount: number;
+}
+
+export function getAllConversations(): ConversationListItem[] {
+  const database = getDB();
+  const stmt = database.prepare(`
+    SELECT
+      thread_id,
+      title,
+      mode,
+      created_at,
+      COUNT(*) as messageCount
+    FROM conversations
+    GROUP BY thread_id
+    ORDER BY MAX(created_at) DESC
+    LIMIT 50
+  `);
+  const rows = stmt.all() as { thread_id: string; title: string | null; mode: string | null; created_at: string; messageCount: number }[];
+  return rows.map(row => ({
+    threadId: row.thread_id,
+    title: row.title,
+    mode: row.mode,
+    created_at: row.created_at,
+    messageCount: row.messageCount,
+  }));
+}
+
 export function searchDecisions(keyword: string): DecisionRecord[] {
   const database = getDB();
   const stmt = database.prepare(

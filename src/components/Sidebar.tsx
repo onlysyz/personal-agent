@@ -10,7 +10,8 @@ import {
   BookOpen,
   LifeBuoy,
   Cpu,
-  BookMarked
+  BookMarked,
+  MessageSquare
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -29,6 +30,7 @@ export default function Sidebar() {
     { name: t('knowledgeBase.title') || 'Knowledge Base', icon: BookMarked, path: '/knowledge-base' },
     { name: t('publicProfile.title'), icon: UserCircle, path: '/public-profile' },
     { name: t('dataEditor.title'), icon: Database, path: '/data-editor' },
+    { name: '对话历史', icon: MessageSquare, path: '/conversations' },
   ];
 
   return (

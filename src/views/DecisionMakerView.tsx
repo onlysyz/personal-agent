@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -20,13 +21,14 @@ import {
   Download,
   Trash2
 } from 'lucide-react';
-import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord, fetchDocumentContent, DocumentContent, exportDecisionsToJSON, exportDecisionsToMarkdown, downloadFile, clearConversation } from '../services/api';
+import { chatWithAgent, fetchDecisions, fetchProfile, DecisionRecord, fetchDocumentContent, DocumentContent, exportDecisionsToJSON, exportDecisionsToMarkdown, downloadFile, clearConversation, fetchConversation, ConversationMessage } from '../services/api';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut';
 import { DecisionAnalysis, ProfileData } from '../types';
 
 export default function DecisionMakerView() {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzingStage, setAnalyzingStage] = useState<string>('');
@@ -86,6 +88,23 @@ export default function DecisionMakerView() {
       }
     },
   });
+
+  // Load conversation from URL param on mount
+  useEffect(() => {
+    const threadParam = searchParams.get('thread');
+    if (threadParam) {
+      fetchConversation(threadParam).then(convMessages => {
+        if (convMessages.length > 0) {
+          threadIdRef.current = threadParam;
+          const loadedMessages = convMessages.map((m: ConversationMessage) => ({
+            role: m.role === 'user' ? 'user' : 'ai' as const,
+            content: m.content,
+          }));
+          setMessages(loadedMessages);
+        }
+      }).catch(console.error);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     let mounted = true;

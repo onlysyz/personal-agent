@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createPersonalAgent } from "../agent/index.js";
 import { getProfile, getPublicProfile } from "../lib/profile.js";
-import { saveDecision, saveMessage, getConversation, clearConversation } from "../lib/db.js";
+import { saveDecision, saveMessage, getConversation, clearConversation, getAllConversations } from "../lib/db.js";
 import { getServerConfig } from "../lib/config.js";
 import { queryWiki } from "../lib/knowledge-base/index.js";
 import { v4 as uuidv4 } from "uuid";
@@ -424,6 +424,17 @@ agentRouter.delete("/conversation/:threadId", (req, res) => {
   } catch (err) {
     console.error("Failed to clear conversation:", err);
     return res.status(500).json({ code: 500, error: "Failed to clear conversation" });
+  }
+});
+
+// GET /api/agent/conversations - List all conversation threads
+agentRouter.get("/conversations", (_req, res) => {
+  try {
+    const conversations = getAllConversations();
+    return res.json({ code: 0, data: conversations });
+  } catch (err) {
+    console.error("Failed to list conversations:", err);
+    return res.status(500).json({ code: 500, error: "Failed to list conversations" });
   }
 });
 
