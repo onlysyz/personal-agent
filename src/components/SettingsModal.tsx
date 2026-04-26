@@ -15,11 +15,44 @@ interface EmbeddingConfig {
   model: string;
 }
 
+const MODEL_PRESETS = {
+  openai: {
+    baseUrl: "https://api.openai.com/v1",
+    models: [
+      { label: "GPT-4o", value: "gpt-4o" },
+      { label: "GPT-4o Mini", value: "gpt-4o-mini" },
+      { label: "GPT-4 Turbo", value: "gpt-4-turbo" },
+      { label: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+    ],
+  },
+  anthropic: {
+    baseUrl: "https://api.anthropic.com/v1",
+    models: [
+      { label: "Claude 3.5 Sonnet", value: "claude-3-5-sonnet-latest" },
+      { label: "Claude 3.5 Haiku", value: "claude-3-5-haiku-latest" },
+      { label: "Claude 3 Opus", value: "claude-3-opus-latest" },
+      { label: "Claude 3 Sonnet", value: "claude-3-sonnet-latest" },
+    ],
+  },
+  ollama: {
+    baseUrl: "http://localhost:11434/v1",
+    models: [
+      { label: "Llama 3", value: "llama3" },
+      { label: "Llama 3.1", value: "llama3.1" },
+      { label: "Mistral", value: "mistral" },
+      { label: "Codellama", value: "codellama" },
+      { label: "Qwen", value: "qwen" },
+      { label: "DeepSeek", value: "deepseek" },
+    ],
+  },
+};
+
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { t } = useTranslation();
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [model, setModel] = useState("");
+  const [provider, setProvider] = useState<"openai" | "anthropic" | "ollama">("openai");
   const [embeddingApiKey, setEmbeddingApiKey] = useState("");
   const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState("");
   const [embeddingModel, setEmbeddingModel] = useState("");
@@ -50,6 +83,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setTestStatus(null);
     }
   }, [apiKey, baseUrl, model]);
+
+  // Detect provider from baseUrl
+  useEffect(() => {
+    if (baseUrl.includes("anthropic") || baseUrl.includes("anthropic")) {
+      setProvider("anthropic");
+    } else if (baseUrl.includes("ollama")) {
+      setProvider("ollama");
+    } else {
+      setProvider("openai");
+    }
+  }, [baseUrl]);
 
   const fetchSettings = async () => {
     setIsLoading(true);
@@ -239,6 +283,31 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
           ) : (
             <>
+              {/* Provider */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-on-surface mb-2">
+                  <Cpu className="w-4 h-4 text-on-surface-variant" />
+                  Provider
+                </label>
+                <div className="relative">
+                  <select
+                    value={provider}
+                    onChange={(e) => {
+                      const p = e.target.value as "openai" | "anthropic" | "ollama";
+                      setProvider(p);
+                      setBaseUrl(MODEL_PRESETS[p].baseUrl);
+                      setModel(MODEL_PRESETS[p].models[0].value);
+                    }}
+                    className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface appearance-none cursor-pointer focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all pr-10"
+                  >
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="ollama">Ollama (Local)</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant pointer-events-none" />
+                </div>
+              </div>
+
               {/* API Key */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-on-surface mb-2">
@@ -275,13 +344,24 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <Cpu className="w-4 h-4 text-on-surface-variant" />
                   {t("settings.model")}
                 </label>
-                <input
-                  type="text"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="gpt-4o, claude-3-5-sonnet-latest, ..."
-                  className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                />
+                <div className="relative">
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface appearance-none cursor-pointer focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all pr-10"
+                  >
+                    <option value="">Select a model...</option>
+                    {MODEL_PRESETS[provider].models.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant pointer-events-none" />
+                </div>
+                {model && (
+                  <p className="text-xs text-on-surface-variant mt-1">Model: {model}</p>
+                )}
               </div>
 
               {/* Embedding Section */}
