@@ -113,7 +113,7 @@ export function saveMessage(
     );
     stmt.run(threadId, role, content, title || null, mode || null);
   } catch (err) {
-    console.error("[saveMessage] Error:", err, { threadId, role, content: content?.slice(0, 50), mode, title });
+    console.error("saveMessage failed:", err);
   }
 }
 

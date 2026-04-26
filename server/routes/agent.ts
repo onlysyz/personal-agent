@@ -251,15 +251,10 @@ ${JSON.stringify(publicProfile, null, 2)}
       }
 
       // Save user message to conversation history
-      console.log("[streamWithAgent] Checking message save - messages.length:", messages.length);
-      console.log("[streamWithAgent] Last message:", messages[messages.length - 1]?.content?.slice(0, 50));
       try {
-        const userMsg = messages[messages.length - 1];
-        console.log("[streamWithAgent] Calling saveMessage with:", { threadId, role: "user", title, mode });
-        saveMessage(threadId, "user", userMsg.content, mode, title);
-        console.log("[streamWithAgent] User message saved successfully");
+        saveMessage(threadId, "user", messages[messages.length - 1].content, mode, title);
       } catch (e) {
-        console.error("[streamWithAgent] Failed to save user message:", e);
+        console.warn("Failed to save user message:", e);
       }
 
       // For decision mode, parse and save the structured analysis
@@ -285,12 +280,10 @@ ${JSON.stringify(publicProfile, null, 2)}
       }
 
       // Save assistant response to conversation history
-      console.log("[streamWithAgent] About to save assistant message:", { threadId, role: "assistant", responseLength: fullResponse.length });
       try {
         saveMessage(threadId, "assistant", fullResponse, mode);
-        console.log("[streamWithAgent] Assistant message saved successfully");
       } catch (e) {
-        console.error("[streamWithAgent] Failed to save assistant message:", e);
+        console.warn("Failed to save assistant message:", e);
       }
 
       return fullResponse;
