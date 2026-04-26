@@ -74,6 +74,19 @@ export default function DecisionMakerView() {
     action: () => queryInputRef.current?.focus(),
   });
 
+  // Ctrl+L to clear conversation
+  useKeyboardShortcut({
+    key: 'l',
+    ctrlKey: true,
+    action: async () => {
+      if (threadIdRef.current) {
+        await clearConversation(threadIdRef.current);
+        threadIdRef.current = null;
+        setMessages([]);
+      }
+    },
+  });
+
   useEffect(() => {
     let mounted = true;
 

@@ -639,3 +639,31 @@ A "Clear" button appears in the DecisionMakerView header when a thread exists:
 - `server/routes/agent.ts` - Added DELETE endpoint
 - `src/services/api.ts` - Added `clearConversation` client function
 - `src/views/DecisionMakerView.tsx` - Added Clear button with Trash2 icon
+
+---
+
+## 12. Keyboard Shortcuts (New Feature)
+
+### Feature Overview
+Power users can use keyboard shortcuts for common actions.
+
+### Available Shortcuts
+
+| Shortcut | Action | View |
+|----------|--------|------|
+| `Ctrl+K` | Focus document search | Knowledge Base |
+| `Ctrl+U` | Upload document | Knowledge Base |
+| `Ctrl+N` | New decision input | Decision Maker |
+| `Ctrl+L` | Clear conversation | Decision Maker |
+| `Ctrl+?` or `Ctrl+/` | Show shortcuts help | Global |
+
+### UI Implementation
+- Keyboard icon in TopBar opens shortcuts modal
+- Modal shows all available shortcuts grouped by view
+- ESC or click outside closes modal
+- `Ctrl+L` clears conversation thread and resets state
+
+### Files Modified
+- `src/components/KeyboardShortcutsModal.tsx` - Added Ctrl+L shortcut to list
+- `src/views/DecisionMakerView.tsx` - Added Ctrl+L keyboard shortcut
+- `src/hooks/useKeyboardShortcut.ts` - Reusable hook (already existed)

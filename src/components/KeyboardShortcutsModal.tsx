@@ -16,6 +16,7 @@ const shortcuts: Shortcut[] = [
   { keys: ['Ctrl', 'K'], description: 'Focus document search', view: 'Knowledge Base' },
   { keys: ['Ctrl', 'U'], description: 'Upload document', view: 'Knowledge Base' },
   { keys: ['Ctrl', 'N'], description: 'New decision input', view: 'Decision Maker' },
+  { keys: ['Ctrl', 'L'], description: 'Clear conversation', view: 'Decision Maker' },
   { keys: ['?', 'Ctrl', '/'], description: 'Show keyboard shortcuts', view: 'Global' },
 ];
 
