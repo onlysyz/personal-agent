@@ -106,11 +106,15 @@ export function saveMessage(
   mode?: string,
   title?: string
 ): void {
-  const database = getDB();
-  const stmt = database.prepare(
-    "INSERT INTO conversations (thread_id, role, content, title, mode, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))"
-  );
-  stmt.run(threadId, role, content, title || null, mode || null);
+  try {
+    const database = getDB();
+    const stmt = database.prepare(
+      "INSERT INTO conversations (thread_id, role, content, title, mode, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))"
+    );
+    stmt.run(threadId, role, content, title || null, mode || null);
+  } catch (err) {
+    console.error("[saveMessage] Error:", err, { threadId, role, content: content?.slice(0, 50), mode, title });
+  }
 }
 
 export function getConversation(threadId: string): ConversationMessage[] {

@@ -146,7 +146,8 @@ async function streamWithAgent(
   messages: { role: string; content: string }[],
   systemPrompt: string,
   mode: "decision" | "profile",
-  threadId: string
+  threadId: string,
+  title?: string
 ): Promise<string> {
   return new Promise(async (resolve, reject) => {
     try {
@@ -250,10 +251,15 @@ ${JSON.stringify(publicProfile, null, 2)}
       }
 
       // Save user message to conversation history
+      console.log("[streamWithAgent] Checking message save - messages.length:", messages.length);
+      console.log("[streamWithAgent] Last message:", messages[messages.length - 1]?.content?.slice(0, 50));
       try {
-        saveMessage(threadId, "user", messages[messages.length - 1].content, mode, title);
+        const userMsg = messages[messages.length - 1];
+        console.log("[streamWithAgent] Calling saveMessage with:", { threadId, role: "user", title, mode });
+        saveMessage(threadId, "user", userMsg.content, mode, title);
+        console.log("[streamWithAgent] User message saved successfully");
       } catch (e) {
-        console.warn("Failed to save user message:", e);
+        console.error("[streamWithAgent] Failed to save user message:", e);
       }
 
       // For decision mode, parse and save the structured analysis
@@ -279,10 +285,12 @@ ${JSON.stringify(publicProfile, null, 2)}
       }
 
       // Save assistant response to conversation history
+      console.log("[streamWithAgent] About to save assistant message:", { threadId, role: "assistant", responseLength: fullResponse.length });
       try {
         saveMessage(threadId, "assistant", fullResponse, mode);
+        console.log("[streamWithAgent] Assistant message saved successfully");
       } catch (e) {
-        console.warn("Failed to save assistant message:", e);
+        console.error("[streamWithAgent] Failed to save assistant message:", e);
       }
 
       return fullResponse;
@@ -391,7 +399,7 @@ agentRouter.post("/", async (req, res, next) => {
     const allMessages = [...historyMessages, { role: "user", content: message }];
 
     // Stream with agent
-    await streamWithAgent(res, allMessages, systemPrompt, activeMode, threadId);
+    await streamWithAgent(res, allMessages, systemPrompt, activeMode, threadId, title);
 
     // Send end event
     res.write(`data: ${JSON.stringify({ type: "end", thread_id: threadId })}\n\n`);
